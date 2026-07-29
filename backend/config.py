@@ -3,6 +3,7 @@ from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    GCP_PROJECT: str = "183840528497"
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
     MAX_TOKENS: int = 8192
