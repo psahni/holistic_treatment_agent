@@ -3,6 +3,7 @@ from typing import TypedDict, List, Dict, Optional, Any
 class NaturopathyState(TypedDict):
     session_id: str
     mode: str
+    recommended_mode: Optional[str]
     step: str
     patient_info: Dict[str, Any]
     chief_complaints: List[str]
@@ -25,6 +26,7 @@ def InitialState() -> NaturopathyState:
     return {
         "session_id": "",
         "mode": "question",
+        "recommended_mode": None,
         "step": "intake",
         "patient_info": {},
         "chief_complaints": [],

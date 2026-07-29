@@ -66,6 +66,7 @@ class NaturopathyAgent:
             "session_id": state.get("session_id", ""),
             "step": state.get("step", "intake"),
             "message": state.get("current_question", ""),
+            "recommended_mode": state.get("recommended_mode"),
             "is_complete": state.get("assessment_complete", False),
             "report": state.get("final_report") if state.get("final_report") else None,
             "safety_flags": state.get("safety_flags", []),
