@@ -2,6 +2,9 @@ import asyncio
 import sys
 import os
 
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # Add the backend directory to the path so it can find 'naturopathy' module
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -45,6 +48,15 @@ async def main():
             print(f"\n[Graph has transitioned to step: {state.get('step')}]")
             if state.get("final_report"):
                  print(f"Final Report: {state.get('final_report')}")
+                 
+        # Check for mode recommendation
+        recommended = state.get("recommended_mode")
+        if recommended and recommended != mode:
+            print(f"\n💡 [The Agent recommends switching to {recommended.upper()} mode for a better experience.]")
+            switch = input(f"Would you like to switch to {recommended.upper()} mode? (y/n): ").strip().lower()
+            if switch == 'y':
+                mode = recommended
+                print(f"[Switched to {mode.upper()} mode]")
 
 if __name__ == "__main__":
     asyncio.run(main())

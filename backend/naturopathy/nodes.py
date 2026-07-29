@@ -3,6 +3,12 @@ import os
 import logging
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_google_vertexai import ChatVertexAI
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class AgentResponse(BaseModel):
+    message: str = Field(description="The formatted response to the user.")
+    recommended_mode: Optional[str] = Field(None, description="'question' or 'treatment' based on symptom complexity.")
 
 from config import get_settings
 from naturopathy.state import NaturopathyState
@@ -67,9 +73,17 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             intro = f"Patient Query: '{latest_user_message}'. Patient Info: {json.dumps(patient_info)}. Please provide immediate Naturopathic root cause analysis, actionable remedies, diet/hydrotherapy guidelines, red flags, and 1 follow-up question."
             messages.append(HumanMessage(content=intro))
             
-        response = llm.invoke(messages)
-        state["current_question"] = response.content
-        state["conversation_history"].append({"role": "agent", "content": response.content})
+        structured_llm = llm.with_structured_output(AgentResponse)
+        response = structured_llm.invoke(messages)
+        
+        if response:
+            state["current_question"] = response.message
+            state["recommended_mode"] = response.recommended_mode
+        else:
+            state["current_question"] = "I apologize, I'm having trouble processing that query properly. Could you rephrase it?"
+            state["recommended_mode"] = None
+            
+        state["conversation_history"].append({"role": "agent", "content": state["current_question"]})
         
     else:
         # Full Treatment Mode logic: 8-turn progressive intake
@@ -88,14 +102,20 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             intro = f"Patient Info: {json.dumps(patient_info)}. Start the full treatment profile collection."
             messages.append(HumanMessage(content=intro))
             
-        response = llm.invoke(messages)
+        structured_llm = llm.with_structured_output(AgentResponse)
+        response = structured_llm.invoke(messages)
         
         if len(responses) >= 8:
             state["step"] = "root_cause"
-            # We don't ask another question, we just proceed. We'll set a transitional message.
             state["current_question"] = "Thank you for providing all the details. I am now analyzing your complete profile for root causes..."
+            state["recommended_mode"] = None
         else:
-            state["current_question"] = response.content
+            if response:
+                state["current_question"] = response.message
+                state["recommended_mode"] = response.recommended_mode
+            else:
+                state["current_question"] = "Could you please elaborate on that?"
+                state["recommended_mode"] = None
             
         state["conversation_history"].append({"role": "agent", "content": state["current_question"]})
         
