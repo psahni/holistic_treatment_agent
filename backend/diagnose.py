@@ -20,11 +20,11 @@ print(f"[2] GEMINI_MODEL: {s.GEMINI_MODEL}")
 if has_real_key:
     print("[3] Testing Gemini LLM call...")
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain_google_vertexai import ChatVertexAI
         from langchain_core.messages import HumanMessage
-        llm = ChatGoogleGenerativeAI(
-            model=s.GEMINI_MODEL,
-            google_api_key=s.GEMINI_API_KEY,
+        llm = ChatVertexAI(
+            model_name=s.GEMINI_MODEL,
+            project=s.GCP_PROJECT,
             temperature=0.3
         )
         resp = llm.invoke([HumanMessage(content="Say hello in one word")])

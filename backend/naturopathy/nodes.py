@@ -2,7 +2,7 @@ import json
 import os
 import logging
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
 
 from config import get_settings
 from naturopathy.state import NaturopathyState
@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 def get_llm():
-    return ChatGoogleGenerativeAI(
-        model=settings.GEMINI_MODEL,
+    return ChatVertexAI(
+        model_name=settings.GEMINI_MODEL,
         temperature=settings.TEMPERATURE,
         max_tokens=settings.MAX_TOKENS,
-        google_api_key=settings.GEMINI_API_KEY,
+        project=settings.GCP_PROJECT,
         max_retries=5
     )
 

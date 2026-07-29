@@ -38,4 +38,4 @@ seed:
 
 test:
 	@echo "🧪 Running Safety & Quality Eval Suite..."
-	cd backend && python -m pytest evals/test_naturopathy_evals.py -v
+	cd backend && python -m pytest evals/ -v
