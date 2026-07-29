@@ -1,0 +1,216 @@
+{
+  "fasting_protocols": {
+    "intermittent_fasting": {
+      "method": "16:8 Protocol (16 hours fasting, 8 hours eating window).",
+      "duration": "Daily or as a lifestyle.",
+      "allowed_during_fast": ["Water", "Black coffee", "Herbal tea without honey/sugar"],
+      "benefits": "Improves insulin sensitivity, promotes cellular repair (autophagy), aids weight management."
+    },
+    "juice_fasting": {
+      "method": "Consuming only freshly pressed, unpasteurized fruit and vegetable juices, clear broths, and herbal teas. No solid food.",
+      "duration": "1 to 5 days (longer requires practitioner supervision).",
+      "daily_guide": {
+        "morning": "Warm water with lemon, followed by Ash Gourd juice (300ml).",
+        "mid_morning": "Carrot-Beetroot-Apple juice.",
+        "afternoon": "Cucumber-Celery-Mint juice.",
+        "evening": "Clear vegetable broth (no salt, only herbs).",
+        "night": "Chamomile or Peppermint tea."
+      },
+      "benefits": "Deep cellular detox, rests the digestive system, floods the body with easily assimilable nutrients."
+    },
+    "water_fasting": {
+      "method": "Strict intake of only pure water. Requires mental and physical rest.",
+      "duration": "24 to 72 hours max without supervision.",
+      "preparation": "3 days of raw foods/juices prior to starting.",
+      "breaking_the_fast": "Break with diluted fruit juice, followed by whole fruits the next day. Slow transition is critical.",
+      "benefits": "Maximum autophagy, immune system reset, profound healing of inflammatory conditions."
+    },
+    "mono_diet": {
+      "method": "Eating only one type of easily digestible food for a specific period.",
+      "duration": "1 to 3 days.",
+      "examples": ["Apple mono-diet", "Papaya mono-diet", "Kitchari (mung bean and rice) mono-diet"],
+      "benefits": "Reduces digestive burden while still providing energy; excellent for sensitive guts."
+    },
+    "elimination_diet": {
+      "method": "Removing common allergens/irritants for 21 days, then reintroducing them one by one to identify triggers.",
+      "duration": "21 to 28 days.",
+      "foods_removed": ["Gluten", "Dairy", "Soy", "Corn", "Eggs", "Nuts", "Nightshades (optional)", "Sugar"],
+      "benefits": "Identifies food intolerances, reduces systemic inflammation, heals leaky gut."
+    }
+  },
+  "therapeutic_diets": {
+    "raw_food_diet": {
+      "principles": "Consuming predominantly (70-100%) uncooked, unprocessed plant foods. Foods are not heated above 48°C (118°F) to preserve enzymes.",
+      "foods_included": ["Fresh fruits", "Raw vegetables", "Sprouts", "Soaked nuts and seeds", "Cold-pressed oils"],
+      "benefits": "High enzyme intake, highly alkalizing, excellent for reversing metabolic syndrome."
+    },
+    "sattvic_diet": {
+      "principles": "Yogic diet emphasizing purity, peace, and lightness. Foods are fresh, lightly cooked, and easily digestible.",
+      "foods_included": ["Fresh fruits", "Vegetables", "Whole grains", "Legumes", "Nuts", "Seeds", "Honey", "Herbal teas"],
+      "foods_avoided": ["Onion", "Garlic", "Meat", "Eggs", "Alcohol", "Overly spicy or stale foods"],
+      "benefits": "Calms the mind, supports meditation, gentle on the digestive system."
+    },
+    "alkaline_diet": {
+      "principles": "Focuses on foods that leave an alkaline ash in the body to balance blood pH and reduce acid load.",
+      "foods_included": ["Leafy greens", "Cruciferous veggies", "Citrus fruits (alkaline forming)", "Root vegetables", "Almonds"],
+      "foods_avoided": ["Meat", "Dairy", "Refined sugar", "Processed grains", "Coffee", "Alcohol"],
+      "benefits": "Reduces inflammation, preserves bone mass, improves energy."
+    },
+    "mucus_free_diet": {
+      "principles": "Based on Arnold Ehret's healing system; eliminates foods that create mucus and toxemia.",
+      "foods_included": ["All kinds of fruits", "Starchless vegetables", "Green leaves"],
+      "foods_avoided": ["Dairy", "Meat", "Starches (rice, potatoes, bread)", "Fats"],
+      "benefits": "Clears respiratory congestion, heals chronic sinusitis, deep systemic cleansing."
+    },
+    "anti_inflammatory_diet": {
+      "principles": "Rich in antioxidants, omega-3 fatty acids, and phytonutrients to quench chronic inflammation.",
+      "foods_included": ["Berries", "Fatty fish (if non-vegetarian)", "Flax/Chia seeds", "Turmeric", "Ginger", "Leafy greens", "Olive oil"],
+      "foods_avoided": ["Trans fats", "Refined sugars", "Processed meats", "Refined seed oils (soybean, corn oil)"],
+      "benefits": "Manages autoimmune conditions, arthritis, and cardiovascular diseases."
+    }
+  },
+  "healing_foods": {
+    "superfoods": [
+      "Sprouts (Alfalfa, Mung bean, Broccoli)",
+      "Moringa leaves/powder",
+      "Wheatgrass juice",
+      "Amla (Indian Gooseberry)",
+      "Turmeric root",
+      "Flaxseeds",
+      "Chia seeds",
+      "Ash Gourd (Winter Melon)"
+    ],
+    "juice_therapy": [
+      {
+        "juice": "Ash Gourd Juice",
+        "ingredients": ["300g Ash Gourd", "Water (if needed)"],
+        "benefits": "Highly alkaline, cooling, deeply detoxifying, excellent for weight loss and mental clarity.",
+        "best_time": "Early morning, empty stomach."
+      },
+      {
+        "juice": "ABC Juice",
+        "ingredients": ["1 Apple", "1 Beetroot", "1 Carrot", "Small piece of ginger"],
+        "benefits": "Builds blood (hemoglobin), detoxifies liver, glowing skin.",
+        "best_time": "Mid-morning."
+      },
+      {
+        "juice": "Green Detox Juice",
+        "ingredients": ["Cucumber", "Celery", "Spinach", "Green Apple", "Lemon", "Mint"],
+        "benefits": "Alkalizing, rich in chlorophyll, diuretic, flushes kidneys.",
+        "best_time": "Morning or afternoon."
+      },
+      {
+        "juice": "Immunity Booster Juice",
+        "ingredients": ["Fresh Amla (2)", "Turmeric root (1 inch)", "Ginger (1 inch)", "Pinch of black pepper"],
+        "benefits": "High Vitamin C, anti-inflammatory, antiviral.",
+        "best_time": "Morning."
+      },
+      {
+        "juice": "Digestive Soother Juice",
+        "ingredients": ["Papaya", "Aloe Vera gel (2 tbsp)", "Mint leaves"],
+        "benefits": "Soothes stomach lining, relieves acidity and constipation.",
+        "best_time": "Pre-breakfast or evening."
+      },
+      {
+        "juice": "Blood Pressure Controller",
+        "ingredients": ["Bottle Gourd (Lauki)", "Mint", "Coriander leaves"],
+        "benefits": "Diuretic, cooling, lowers blood pressure. (Ensure lauki is not bitter).",
+        "best_time": "Morning, empty stomach."
+      },
+      {
+        "juice": "Skin Glow Juice",
+        "ingredients": ["Carrot", "Tomato", "Orange", "Pomegranate"],
+        "benefits": "Rich in beta-carotene and Vitamin C, anti-aging.",
+        "best_time": "Mid-morning."
+      },
+      {
+        "juice": "Joint Care Juice",
+        "ingredients": ["Pineapple", "Cucumber", "Ginger", "Turmeric"],
+        "benefits": "Bromelain in pineapple and curcumin reduce joint inflammation.",
+        "best_time": "Afternoon."
+      },
+      {
+        "juice": "Lung Cleanser",
+        "ingredients": ["Carrot", "Apple", "Ginger", "Pinch of cayenne"],
+        "benefits": "Breaks down mucus, warms the body, stimulates circulation.",
+        "best_time": "Morning."
+      },
+      {
+        "juice": "Sleep Inducer",
+        "ingredients": ["Tart cherry juice", "Chamomile tea base"],
+        "benefits": "Natural source of melatonin, relaxes nervous system.",
+        "best_time": "1 hour before bed."
+      }
+    ],
+    "herbal_teas": [
+      "Cumin-Coriander-Fennel (CCF) Tea for digestion.",
+      "Tulsi and Ginger tea for immunity and respiratory health.",
+      "Chamomile tea for relaxation.",
+      "Dandelion root tea for liver support.",
+      "Hibiscus tea for blood pressure management."
+    ]
+  },
+  "foods_classification": {
+    "sattvic": [
+      "Fresh organic fruits",
+      "Fresh vegetables",
+      "Whole grains (Oats, Brown Rice, Quinoa)",
+      "Legumes (Mung beans, Lentils)",
+      "Nuts and Seeds (Almonds, Walnuts, Sesame)",
+      "Natural sweeteners (Honey, Jaggery in moderation)",
+      "Herbal teas"
+    ],
+    "rajasic": [
+      "Onion",
+      "Garlic",
+      "Chilies",
+      "Coffee",
+      "Strong black tea",
+      "Highly spiced foods",
+      "Very salty foods"
+    ],
+    "tamasic": [
+      "Meat",
+      "Fish",
+      "Eggs",
+      "Alcohol",
+      "Stale or leftover food",
+      "Deep-fried foods",
+      "Processed and canned foods",
+      "Refined sugar"
+    ]
+  },
+  "meal_timing_principles": {
+    "breakfast": "Eat like a king. Largest meal of the day if physical work is high, or keep it light with fruits if doing sedentary work. Best time: 7:00 AM - 9:00 AM.",
+    "lunch": "Main meal of the day when digestive fire (Agni) is highest. Best time: 12:00 PM - 2:00 PM.",
+    "dinner": "Lightest meal. Should be consumed before sunset or at least 3 hours before sleep. Avoid heavy proteins and raw cold salads at night. Best time: 6:00 PM - 7:30 PM.",
+    "general_rules": "Eat only when truly hungry. Fill 50% of stomach with food, 25% with water, leave 25% empty for air and digestion. Drink water 1 hour before or 1 hour after meals, never during meals."
+  },
+  "condition_specific_diets": {
+    "for_diabetes_support": {
+      "focus": "Low glycemic index, high fiber, complex carbohydrates.",
+      "foods_to_eat": ["Bitter Gourd (Karela)", "Fenugreek seeds", "Jamun", "Leafy greens", "Millets (Foxtail, Barnyard)", "Cinnamon"],
+      "foods_to_avoid": ["Refined sugar", "White rice", "Maida (refined wheat)", "Potatoes", "Sweet fruits (Mango, Banana) in excess"]
+    },
+    "for_hypertension": {
+      "focus": "DASH-style, low sodium, high potassium.",
+      "foods_to_eat": ["Bottle Gourd (Lauki) juice", "Garlic", "Banana", "Celery", "Hibiscus tea", "Flaxseeds"],
+      "foods_to_avoid": ["Table salt", "Pickles", "Papads", "Canned foods", "Caffeine", "Alcohol"]
+    },
+    "for_weight_management": {
+      "focus": "Caloric deficit with high nutrient density, intermittent fasting.",
+      "foods_to_eat": ["Ash Gourd juice", "Warm water with lemon/honey", "Sprouts", "Salads before meals", "Soups", "Oats"],
+      "foods_to_avoid": ["Deep-fried foods", "Sweets", "Refined carbs", "Dairy products (especially cheese/butter)"]
+    },
+    "for_liver_health": {
+      "focus": "Bitter, astringent tastes, easy to digest.",
+      "foods_to_eat": ["Radish", "Beetroot", "Carrot", "Dandelion greens", "Turmeric", "Lemon", "Papaya"],
+      "foods_to_avoid": ["Alcohol", "Heavy fats", "Trans fats", "Excessive painkillers (paracetamol)", "Refined sugar"]
+    },
+    "for_digestive_health": {
+      "focus": "Soothing, easily digestible, probiotic-rich.",
+      "foods_to_eat": ["Kitchari (mung beans and rice)", "Papaya", "Cumin water", "Buttermilk (if not strict vegan)", "Ginger", "Fennel seeds"],
+      "foods_to_avoid": ["Spicy foods", "Deep-fried foods", "Raw cabbage/broccoli (if bloated)", "Cold/ice water"]
+    }
+  }
+}

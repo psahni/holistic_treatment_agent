@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+build/
+.npm/
+
+# Logs & DBs
+*.log
+*.sqlite3
+*.db
+backend/holistic_health.db
+backend/evals/
+.deepeval/
+
+# Data & Models
+backend/data/docs/
+backend/chroma_db/
+backend/qdrant_db/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

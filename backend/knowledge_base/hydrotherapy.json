@@ -1,0 +1,197 @@
+{
+  "principles": "Hydrotherapy uses water at various temperatures (hot, cold, neutral) and in various forms (ice, liquid, steam) to stimulate the body's natural healing force. Cold water stimulates and invigorates, hot water relaxes and dilates blood vessels, and contrast therapy creates a pumping action to improve circulation and reduce inflammation.",
+  "treatments": {
+    "cold_applications": {
+      "cold_compress": {
+        "method": "Dip a cotton cloth in cold water (10-15°C), wring it out, and apply to the affected area. Cover with a dry woolen cloth. Renew when the cloth becomes warm.",
+        "duration": "10-20 minutes",
+        "temperature": "10-15°C",
+        "frequency": "2-3 times a day",
+        "benefits": "Reduces localized inflammation, relieves pain in acute injuries, reduces fever, and relieves headaches.",
+        "contraindications": "Do not use over numbed areas, on patients with poor circulation, or directly over the chest in acute asthma."
+      },
+      "cold_hip_bath": {
+        "method": "Sit in a hip bath tub filled with cold water such that the water covers the area from the navel to the mid-thighs. Keep the feet resting outside on a dry footstool. Vigorously rub the abdomen in a circular motion with a rough towel.",
+        "duration": "10-15 minutes",
+        "temperature": "12-18°C",
+        "frequency": "Once daily, preferably empty stomach in the morning",
+        "benefits": "Improves digestion, relieves constipation, stimulates the liver and kidneys, reduces pelvic congestion.",
+        "contraindications": "Menstruation, acute pelvic inflammation, diarrhea, severe backache."
+      },
+      "cold_foot_bath": {
+        "method": "Immerse feet and ankles in cold water. Rub the feet against each other.",
+        "duration": "5-10 minutes",
+        "temperature": "10-15°C",
+        "frequency": "1-2 times daily",
+        "benefits": "Relieves cerebral congestion, useful in insomnia and headache.",
+        "contraindications": "Chilblains, acute urinary tract infection."
+      },
+      "cold_sponging": {
+        "method": "Wipe the entire body rapidly with a towel dipped in cold water and wrung out, followed by brisk rubbing with a dry towel to produce reactive warmth.",
+        "duration": "2-5 minutes",
+        "temperature": "15-20°C",
+        "frequency": "As needed (up to 3-4 times a day during high fever)",
+        "benefits": "Brings down high fever, stimulates the nervous system, improves skin tone.",
+        "contraindications": "Chills, extreme weakness, asthma."
+      },
+      "cold_pack": {
+        "method": "Wrap the affected body part (e.g., abdomen, chest) with a wet cold cotton cloth, then completely cover it with a dry flannel or woolen cloth to trap body heat and induce sweating.",
+        "duration": "30-60 minutes",
+        "temperature": "15-20°C",
+        "frequency": "Once a day",
+        "benefits": "Draws out toxins, reduces deep-seated inflammation, relieves internal congestion.",
+        "contraindications": "Skin infections, severe anemia."
+      }
+    },
+    "hot_applications": {
+      "hot_compress": {
+        "method": "Dip a towel in hot water, wring out excess water, and apply to the affected area. Cover to retain heat. Replace as it cools.",
+        "duration": "15-20 minutes",
+        "temperature": "40-45°C",
+        "frequency": "2-3 times a day",
+        "benefits": "Relieves muscle spasms, joint pain, and menstrual cramps. Increases local circulation.",
+        "contraindications": "Acute inflammation, swelling, bleeding disorders, loss of sensation."
+      },
+      "steam_inhalation": {
+        "method": "Inhale steam from a bowl of hot water. A towel can be draped over the head to trap the steam. Essential oils like eucalyptus or tulsi leaves can be added.",
+        "duration": "10-15 minutes",
+        "temperature": "Steam (around 45-50°C at inhalation point)",
+        "frequency": "2-3 times a day",
+        "benefits": "Clears nasal and chest congestion, relieves sinusitis, soothes throat irritation.",
+        "contraindications": "Very high blood pressure, extreme facial skin sensitivity."
+      },
+      "hot_foot_bath": {
+        "method": "Immerse feet and ankles in hot water. A cold compress must be applied to the head and neck simultaneously to prevent cerebral congestion.",
+        "duration": "15-20 minutes",
+        "temperature": "40-45°C",
+        "frequency": "Once daily before bed",
+        "benefits": "Relieves headaches, induces sleep, relieves pelvic congestion, and helps in asthma.",
+        "contraindications": "Varicose veins, severe diabetic neuropathy."
+      },
+      "fomentation": {
+        "method": "Application of moist heat using a hot water bag wrapped in a wet towel, applied over the affected part.",
+        "duration": "15-20 minutes",
+        "temperature": "45-50°C",
+        "frequency": "2 times a day",
+        "benefits": "Relieves deep-seated muscular and joint pains, reduces spasms.",
+        "contraindications": "Acute injuries with swelling, appendicitis."
+      }
+    },
+    "contrast_applications": {
+      "contrast_hip_bath": {
+        "method": "Sit in a hot hip bath for 3 minutes, then immediately shift to a cold hip bath for 1 minute. Repeat this cycle 3-4 times. Always end with cold.",
+        "duration": "15-20 minutes total",
+        "temperature": "Hot: 40-45°C, Cold: 15-20°C",
+        "frequency": "Once daily",
+        "benefits": "Acts as a vascular pump, strongly stimulates pelvic circulation, relieves chronic pelvic inflammation and constipation.",
+        "contraindications": "Menstruation, acute inflammation, pregnancy."
+      },
+      "contrast_arm_bath": {
+        "method": "Immerse arms in hot water for 3 minutes, then cold water for 1 minute. Repeat 3 times, ending with cold.",
+        "duration": "12 minutes total",
+        "temperature": "Hot: 40-45°C, Cold: 15-20°C",
+        "frequency": "1-2 times daily",
+        "benefits": "Relieves hand arthritis, improves circulation in upper extremities, helps relieve headaches.",
+        "contraindications": "Open wounds on arms."
+      },
+      "contrast_compress": {
+        "method": "Apply a hot compress for 3 minutes, followed by a cold compress for 1 minute. Repeat 3 times, ending with cold.",
+        "duration": "12-15 minutes",
+        "temperature": "Hot: 45°C, Cold: 15°C",
+        "frequency": "2 times a day",
+        "benefits": "Accelerates healing of chronic joint pain, sprains (after acute phase), and muscle strains.",
+        "contraindications": "Acute phase of sprain (first 48 hours)."
+      }
+    },
+    "full_body": {
+      "wet_sheet_pack": {
+        "method": "Wrap the patient tightly in a wet cold cotton sheet, followed by a dry woolen blanket to trap heat. The patient goes through three stages: cooling, neutral/heating, and sweating.",
+        "duration": "45-60 minutes",
+        "temperature": "Initial sheet temperature 15-20°C",
+        "frequency": "2-3 times a week",
+        "benefits": "Strong detoxifying effect, breaks chronic fevers, deep relaxation, improves skin elimination.",
+        "contraindications": "Heart disease, extreme debility, asthma, claustrophobia."
+      },
+      "neutral_bath": {
+        "method": "Immerse the full body (except head) in a bathtub filled with water at exact body temperature.",
+        "duration": "30-60 minutes",
+        "temperature": "34-36°C",
+        "frequency": "Once daily",
+        "benefits": "Calms the nervous system, highly effective for insomnia, anxiety, and stress.",
+        "contraindications": "Eczema, low blood pressure."
+      },
+      "cold_water_treading": {
+        "method": "Walk in cold water (ankle to calf deep) imitating a stork walk, lifting one foot completely out of water while the other is immersed.",
+        "duration": "3-5 minutes",
+        "temperature": "10-15°C",
+        "frequency": "Once daily",
+        "benefits": "Improves leg circulation, strengthens immune system, relieves varicose veins.",
+        "contraindications": "Sciatica, pelvic inflammatory disease, urinary tract infection."
+      }
+    },
+    "enema": {
+      "warm_water_enema": {
+        "method": "Administer warm water into the rectum using an enema can and lubricated nozzle while lying on the left side or in knee-chest position. Retain for 5-10 minutes before evacuating.",
+        "duration": "10-15 minutes total",
+        "temperature": "37-38°C",
+        "frequency": "As prescribed (usually during fasting or severe constipation)",
+        "benefits": "Cleanses the colon, relieves acute constipation, essential prep for fasting.",
+        "contraindications": "Intestinal obstruction, acute appendicitis, severe hemorrhoids, recent colon surgery."
+      },
+      "neem_enema": {
+        "method": "Prepare a decoction of neem leaves, filter, cool to body temperature, and administer as a regular enema.",
+        "duration": "10-15 minutes total",
+        "temperature": "37-38°C",
+        "frequency": "1-2 times a week",
+        "benefits": "Antibacterial, antiparasitic, heals intestinal inflammation, clears gut infections.",
+        "contraindications": "Same as warm water enema."
+      }
+    }
+  },
+  "condition_specific_protocols": {
+    "for_fever": [
+      "Cold sponging every 2-3 hours.",
+      "Cold compress on forehead continuously.",
+      "Warm water enema to clear the bowels."
+    ],
+    "for_constipation": [
+      "Cold hip bath for 15 mins every morning.",
+      "Warm water enema initially for 3 days.",
+      "Cold abdomen pack at night."
+    ],
+    "for_joint_pain": [
+      "Hot and cold contrast compress over the affected joint.",
+      "Fomentation for 15 mins daily.",
+      "Epsom salt warm bath twice a week."
+    ],
+    "for_headache": [
+      "Hot foot bath with a cold towel on the head.",
+      "Cold compress to the forehead and neck.",
+      "Cold foot bath (if headache is due to stress)."
+    ],
+    "for_insomnia": [
+      "Neutral bath for 30 minutes before bed.",
+      "Hot foot bath for 15 minutes before bed.",
+      "Cold pack to the abdomen at night."
+    ],
+    "for_skin_conditions": [
+      "Neem water bath.",
+      "Wet sheet pack to induce sweating and eliminate toxins.",
+      "Cold hip bath to stimulate liver function."
+    ],
+    "for_respiratory": [
+      "Steam inhalation with eucalyptus oil.",
+      "Hot fomentation over the chest and upper back.",
+      "Hot foot bath to relieve chest congestion."
+    ]
+  },
+  "contraindications": {
+    "general": [
+      "Extreme debility and exhaustion.",
+      "Severe cardiac insufficiency or advanced heart disease.",
+      "Immediately after a heavy meal (wait at least 2 hours).",
+      "During menstruation (avoid hip and full-body cold baths).",
+      "Loss of thermal sensation (diabetic neuropathy) for hot applications."
+    ]
+  }
+}
