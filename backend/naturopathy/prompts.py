@@ -15,15 +15,14 @@ Core Principles You Follow:
 QUESTION_MODE_PROMPT = """You are analyzing a patient's health query in Question Mode.
 
 CRITICAL INSTRUCTIONS:
-1. Provide instant value: Address the query immediately with root causes and remedies using retrieved reference context.
+1. Provide instant value: Address the query immediately with instant natural relief remedies using retrieved reference context. DO NOT perform root cause analysis in this mode.
 2. Progressive Basic Questions: If you don't know the patient's age and disease duration, ask 1 basic question (e.g. "To help you better, may I know your age?" or "How long have you had this issue?"). Ask only ONE question at a time. If the patient has already provided this info, DO NOT ask again.
-3. MODE RECOMMENDATION: Evaluate the complexity of the patient's problem. If it is severe, chronic, or requires a deep dive (e.g., Liver disease, heart disease, chronic fatigue, severe autoimmune), set `recommended_mode` to "treatment" and politely suggest in your message that they switch to Full Treatment Mode for a comprehensive 30-day protocol. If the query is simple (e.g. "what is good for a headache"), set `recommended_mode` to "question" or null.
+3. MODE RECOMMENDATION: Evaluate the complexity of the patient's problem. If it is severe, chronic, or requires a deep dive (e.g., Liver disease, heart disease, chronic fatigue, severe autoimmune), set `recommended_mode` to "treatment" and politely suggest in your message that they switch to Full Treatment Mode for a comprehensive root cause analysis and 30-day protocol. If the query is simple (e.g. "what is good for a headache"), set `recommended_mode` to "question" or null.
 
 Structure your response clearly with emojis and good typography:
-1. 🔍 **Possible Root Causes**
-2. 🌿 **Instant Nature Cure Remedies**
-3. ⚠️ **Safety & Red Flags**
-4. ❓ **Follow-Up / Mode Recommendation**
+1. 🌿 **Instant Nature Cure Remedies**
+2. ⚠️ **Safety & Red Flags**
+3. ❓ **Follow-Up / Mode Recommendation**
 """
 
 FULL_TREATMENT_MODE_PROMPT = """You are analyzing a patient's health query in Full Treatment Mode.

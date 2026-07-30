@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from .state import NaturopathyState
 from .nodes import (
     intake_node, root_cause_node, 
-    protocol_selection_node, recommendation_node, 
+    treatment_design_node, recommendation_node, 
     guardrail_output_node
 )
 
@@ -31,7 +31,7 @@ def build_naturopathy_graph():
     # Add nodes
     graph.add_node('intake', intake_node)
     graph.add_node('root_cause', root_cause_node)
-    graph.add_node('protocol_selection', protocol_selection_node)
+    graph.add_node('treatment_design', treatment_design_node)
     graph.add_node('recommendation', recommendation_node)
     graph.add_node('guardrail', guardrail_output_node)
     
@@ -49,9 +49,9 @@ def build_naturopathy_graph():
         }
     )
     
-    # Analysis pipeline: root_cause → protocol_selection → recommendation → guardrail → END
-    graph.add_edge('root_cause', 'protocol_selection')
-    graph.add_edge('protocol_selection', 'recommendation')
+    # Analysis pipeline: root_cause → treatment_design → recommendation → guardrail → END
+    graph.add_edge('root_cause', 'treatment_design')
+    graph.add_edge('treatment_design', 'recommendation')
     graph.add_edge('recommendation', 'guardrail')
     graph.add_edge('guardrail', END)
     

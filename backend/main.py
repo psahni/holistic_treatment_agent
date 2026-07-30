@@ -13,7 +13,7 @@ from naturopathy.agent import NaturopathyAgent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
-from memory.patient_profile import init_db
+from database.models import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +22,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Naturopathy Health Triage Agent", lifespan=lifespan)
 settings = get_settings()
+
+from auth.router import router as auth_router
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,8 +51,9 @@ async def start_session(symptom_input: SymptomInput):
     # Initialize session state via agent
     out_state = await agent.start_session(patient_info_dict, session_id, mode=symptom_input.mode)
     
-    # Process initial message
-    out_state = await agent.process_message(session_id, symptom_input.message, out_state, mode=symptom_input.mode)
+    # Process initial message if provided
+    if symptom_input.message.strip():
+        out_state = await agent.process_message(session_id, symptom_input.message, out_state, mode=symptom_input.mode)
     
     # Apply output guardrails
     if out_state.get("current_question"):

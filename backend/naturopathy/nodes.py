@@ -50,14 +50,23 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
         
     if mode == "question":
         # Question Mode logic: instant triage
-        hybrid = retrieve_hybrid_context(latest_user_message)
-        retrieved_context = hybrid.get("context_text", "")
+        meta_phrases = ["i want to ask next question", "i have a question", "can i ask", "next question", "another question", "i want to ask", "hello", "hi"]
+        is_meta = any(phrase in latest_user_message.lower() for phrase in meta_phrases) and len(latest_user_message.split()) < 10
         
-        system_instruction = (
-            SYSTEM_PROMPT + "\n\n" + 
-            QUESTION_MODE_PROMPT + "\n\n" +
-            f"RETRIEVED AUTHENTIC REFERENCE CONTEXT:\n{retrieved_context}"
-        )
+        if is_meta:
+            system_instruction = (
+                SYSTEM_PROMPT + "\n\n" + 
+                "The user just greeted you or stated they want to ask a question. Simply respond politely and invite them to ask their question. DO NOT provide remedies or root cause analysis."
+            )
+        else:
+            hybrid = retrieve_hybrid_context(latest_user_message)
+            retrieved_context = hybrid.get("context_text", "")
+            
+            system_instruction = (
+                SYSTEM_PROMPT + "\n\n" + 
+                QUESTION_MODE_PROMPT + "\n\n" +
+                f"RETRIEVED AUTHENTIC REFERENCE CONTEXT:\n{retrieved_context}"
+            )
         
         messages = [SystemMessage(content=system_instruction)]
         
@@ -70,7 +79,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
                 messages.append(AIMessage(content=msg["content"]))
                 
         if not has_human_message:
-            intro = f"Patient Query: '{latest_user_message}'. Patient Info: {json.dumps(patient_info)}. Please provide immediate Naturopathic root cause analysis, actionable remedies, diet/hydrotherapy guidelines, red flags, and 1 follow-up question."
+            intro = f"Patient Query: '{latest_user_message}'. Patient Info: {json.dumps(patient_info)}. Please provide immediate actionable Naturopathic remedies, diet/hydrotherapy guidelines, red flags, and 1 follow-up question. Do not provide a root cause analysis."
             messages.append(HumanMessage(content=intro))
             
         structured_llm = llm.with_structured_output(AgentResponse)
@@ -145,10 +154,10 @@ def root_cause_node(state: NaturopathyState) -> NaturopathyState:
         state["error"] = f"Failed to parse root causes: {str(e)}"
         state["root_causes"] = []
         
-    state["step"] = "protocol_selection"
+    state["step"] = "treatment_design"
     return state
 
-def protocol_selection_node(state: NaturopathyState) -> NaturopathyState:
+def treatment_design_node(state: NaturopathyState) -> NaturopathyState:
     llm = get_llm()
     root_causes = state.get("root_causes", [])
     

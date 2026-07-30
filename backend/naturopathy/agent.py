@@ -16,26 +16,16 @@ class NaturopathyAgent:
         state['patient_info'] = patient_info
         state['mode'] = mode
         
-        # Run the graph — intake_node will generate the first question
-        # and should_continue will route back to 'intake' since step is still 'intake'
-        # But we DON'T want it to loop — we just want one pass.
-        # Use the graph to run just the intake node once.
-        try:
-            result_state = await self.graph.ainvoke(state)
-            return result_state
-        except Exception as e:
-            logger.error(f"start_session graph error: {e}", exc_info=True)
-            # Return state with error so the user gets a message
-            state['current_question'] = (
-                "Welcome to NatureCure AI! I'm here to help you explore natural healing. "
-                "Could you please tell me about the main health concern you're experiencing today?"
-            )
-            state['conversation_history'].append({
-                "role": "agent", 
-                "content": state['current_question']
-            })
-            state['error'] = str(e)
-            return state
+        # Simply return the initial state with a welcome message without invoking the LLM graph
+        state['current_question'] = (
+            "Welcome to NatureCure AI! I'm here to help you explore natural healing. "
+            "Could you please tell me about the main health concern you're experiencing today?"
+        )
+        state['conversation_history'].append({
+            "role": "agent", 
+            "content": state['current_question']
+        })
+        return state
     
     async def process_message(self, session_id: str, message: str, state: dict, mode: str = None) -> dict:
         """Process a user message and return updated state with the agent's response."""
