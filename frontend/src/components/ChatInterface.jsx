@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Leaf } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { naturopathyAPI } from '../services/api';
 import AssessmentProgress from './AssessmentProgress';
 import RecommendationCard from './RecommendationCard';
 import SafetyAlert from './SafetyAlert';
 
-export default function ChatInterface({ sessionId }) {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.' }
-  ]);
+export default function ChatInterface({ sessionId, user }) {
+  const [messages, setMessages] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(sessionId !== 'new' ? sessionId : null);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [step, setStep] = useState('intake');
@@ -19,6 +20,37 @@ export default function ChatInterface({ sessionId }) {
   const [needsPractitioner, setNeedsPractitioner] = useState(false);
   
   const endOfMessagesRef = useRef(null);
+
+  useEffect(() => {
+    if (sessionId === 'new' && !activeSessionId) {
+      startNewSession();
+    } else if (messages.length === 0) {
+      setMessages([{ role: 'assistant', content: 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.' }]);
+    }
+  }, []);
+
+  const startNewSession = async () => {
+    setIsTyping(true);
+    try {
+      const response = await naturopathyAPI.startSession({
+        name: user?.name || 'User',
+        age: user?.age || 30,
+        region: user?.city || user?.region || 'Not specified',
+        gender: user?.gender || 'other'
+      });
+      setActiveSessionId(response.session_id);
+      if (response.message) {
+        setMessages([{ role: 'assistant', content: response.message }]);
+      } else {
+        setMessages([{ role: 'assistant', content: 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.' }]);
+      }
+    } catch(err) {
+      console.error(err);
+      setMessages([{ role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,7 +65,7 @@ export default function ChatInterface({ sessionId }) {
     setIsTyping(true);
     
     try {
-      const response = await naturopathyAPI.sendMessage(sessionId, userMessage);
+      const response = await naturopathyAPI.sendMessage(activeSessionId, userMessage);
       
       // Backend returns AssessmentResponse: { session_id, step, message, is_complete, report, safety_flags, need_practitioner }
       if (response.message) {
@@ -101,7 +133,18 @@ export default function ChatInterface({ sessionId }) {
                 boxShadow: 'var(--shadow-sm)',
                 lineHeight: 1.5
               }}>
-                {msg.content}
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
+                    ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                    ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                    li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
+                    strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               </div>
             </motion.div>
           ))}
@@ -111,10 +154,13 @@ export default function ChatInterface({ sessionId }) {
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Leaf size={20} color="var(--cream)" />
               </div>
-              <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', gap: '4px' }}>
-                <div style={{ width: 8, height: 8, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both' }}></div>
-                <div style={{ width: 8, height: 8, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}></div>
-                <div style={{ width: 8, height: 8, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}></div>
+              <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--forest)', fontWeight: 500, fontSize: '0.9rem' }}>Loading...</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both' }}></div>
+                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}></div>
+                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}></div>
+                </div>
               </div>
             </div>
           )}

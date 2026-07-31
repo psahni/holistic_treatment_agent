@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean, ForeignKey, create_engine, Uuid
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from config import get_settings
 import uuid
 from datetime import datetime
@@ -9,26 +9,46 @@ logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    phone_number = Column(String, unique=True, nullable=False)
+    city = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    profiles = relationship("PatientProfile", back_populates="user")
+    sessions = relationship("ConsultationSession", back_populates="user")
+
 class PatientProfile(Base):
     __tablename__ = 'patient_profiles'
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.id'), nullable=True)
     age = Column(Integer)
     gender = Column(String)
     region = Column(String)
     occupation = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("User", back_populates="profiles")
 
 class ConsultationSession(Base):
     __tablename__ = 'consultation_sessions'
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     patient_id = Column(Uuid(as_uuid=True), ForeignKey('patient_profiles.id'))
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.id'), nullable=True)
     session_data = Column(JSON)
     root_causes = Column(JSON)
     protocols_recommended = Column(JSON)
     completed_at = Column(DateTime)
     need_practitioner = Column(Boolean)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="sessions")
 
 settings = get_settings()
 
@@ -41,7 +61,7 @@ def create_db_engine(db_url: str):
     else:
         return create_engine(
             db_url,
-            connect_args={"connect_timeout": 5}
+            connect_args={"connect_timeout": 15}
         )
 
 engine = None

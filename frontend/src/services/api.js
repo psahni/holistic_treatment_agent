@@ -1,13 +1,62 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+const fetchWithCredentials = async (url, options = {}) => {
+  const finalOptions = {
+    ...options,
+    credentials: 'include', // Needed for HTTP-only cookies
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  };
+  
+  const res = await fetch(url, finalOptions);
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const error = new Error(`API Error: ${res.status}`);
+    error.response = { data: errorData };
+    throw error;
+  }
+  
+  return await res.json();
+};
+
 export const naturopathyAPI = {
+  // Authentication Endpoints
+  signup: async (userData) => {
+    return fetchWithCredentials(`${API_BASE}/api/auth/signup`, {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+  
+  login: async (credentials) => {
+    return fetchWithCredentials(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
+  },
+  
+  logout: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/auth/logout`, {
+      method: 'POST'
+    });
+  },
+  
+  getMe: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/auth/me`, {
+      method: 'GET'
+    });
+  },
+
+  // Agent Endpoints
   startSession: async (patientInfo) => {
     try {
-      const res = await fetch(`${API_BASE}/api/naturo/start`, {
+      const data = await fetchWithCredentials(`${API_BASE}/api/naturo/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: "Hello, I'd like to start my naturopathy assessment.",
+          message: "",
           patient_info: {
             age: parseInt(patientInfo.age) || 30,
             gender: patientInfo.gender || 'other',
@@ -17,23 +66,19 @@ export const naturopathyAPI = {
           session_id: null
         })
       });
-      if (!res.ok) throw new Error(`API Error: ${res.status}`);
-      const data = await res.json();
-      return { session_id: data.session_id };
+      return { session_id: data.session_id, message: data.message };
     } catch(e) {
       console.warn('Backend not responding, using mock session:', e.message);
-      return { session_id: 'mock-session-' + Date.now() };
+      return { session_id: 'mock-session-' + Date.now(), message: "Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today." };
     }
   },
+  
   sendMessage: async (sessionId, message) => {
     try {
-      const res = await fetch(`${API_BASE}/api/naturo/chat`, {
+      return await fetchWithCredentials(`${API_BASE}/api/naturo/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message })
       });
-      if (!res.ok) throw new Error('API Error');
-      return await res.json();
     } catch(e) {
       // Mock response
       return {
@@ -44,8 +89,8 @@ export const naturopathyAPI = {
       };
     }
   },
+  
   getSession: async (sessionId) => {
-    const res = await fetch(`${API_BASE}/api/session/${sessionId}`);
-    return res.json();
+    return fetchWithCredentials(`${API_BASE}/api/session/${sessionId}`);
   }
 };
