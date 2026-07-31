@@ -13,7 +13,7 @@ help:
 	@echo "  make test          - Run safety & quality test suite (pytest)"
 
 start:
-	@echo "🚀 Starting NatureCure AI Servers..."
+	@echo "🚀 Starting n NatureCure AI Servers..."
 	powershell -ExecutionPolicy Bypass -File ./scripts/start.ps1
 
 stop:
