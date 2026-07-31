@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uuid
@@ -85,6 +86,30 @@ async def chat(request: ChatRequest):
         
     session_store.save_session(request.session_id, out_state)
     return agent.get_session_response(out_state)
+
+@app.post("/api/naturo/chat_stream")
+async def chat_stream(request: ChatRequest):
+    state = session_store.get_session(request.session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    guardrail_result = run_input_guardrails(request.message)
+    if not guardrail_result["safe"]:
+        response = agent.get_session_response(state)
+        response["message"] = guardrail_result["message"]
+        response["safety_flags"] = guardrail_result.get("flags", [])
+        import json
+        
+        async def mock_stream():
+            yield f"data: {json.dumps({'chunk': guardrail_result['message']})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'state': response})}\n\n"
+            
+        return StreamingResponse(mock_stream(), media_type="text/event-stream")
+        
+    return StreamingResponse(
+        agent.process_message_stream(request.session_id, request.message, state, mode=request.mode),
+        media_type="text/event-stream"
+    )
 
 @app.get("/api/session/{id}", response_model=AssessmentResponse)
 def get_session(id: str):

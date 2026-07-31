@@ -6,12 +6,12 @@ from typing import Optional, Dict, Any
 class SessionStore:
     def __init__(self):
         settings = get_settings()
+        self.fallback_store = {}
         try:
             self.client = redis.from_url(settings.REDIS_URL)
             self.use_redis = True
         except Exception:
             self.use_redis = False
-            self.fallback_store = {}
         self.ttl = 3600  # 1 hour session TTL
     
     def save_session(self, session_id: str, state: dict) -> None:

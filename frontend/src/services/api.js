@@ -90,6 +90,45 @@ export const naturopathyAPI = {
     }
   },
   
+  streamMessage: async function* (sessionId, message) {
+    const res = await fetch(`${API_BASE}/api/naturo/chat_stream`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message })
+    });
+
+    if (!res.ok) {
+      throw new Error(`API Error: ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6);
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.error) throw new Error(data.error);
+            yield data;
+          } catch (e) {
+            console.error('Failed to parse stream JSON:', e);
+          }
+        }
+      }
+    }
+  },
+  
   getSession: async (sessionId) => {
     return fetchWithCredentials(`${API_BASE}/api/session/${sessionId}`);
   }

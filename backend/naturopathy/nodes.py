@@ -82,12 +82,20 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             intro = f"Patient Query: '{latest_user_message}'. Patient Info: {json.dumps(patient_info)}. Please provide immediate actionable Naturopathic remedies, diet/hydrotherapy guidelines, red flags, and 1 follow-up question. Do not provide a root cause analysis."
             messages.append(HumanMessage(content=intro))
             
-        structured_llm = llm.with_structured_output(AgentResponse)
-        response = structured_llm.invoke(messages)
+        response = llm.invoke(messages)
         
-        if response:
-            state["current_question"] = response.message
-            state["recommended_mode"] = response.recommended_mode
+        if response and response.content:
+            content = response.content
+            if "[MODE: treatment]" in content:
+                state["recommended_mode"] = "treatment"
+                content = content.replace("[MODE: treatment]", "").strip()
+            elif "[MODE: question]" in content:
+                state["recommended_mode"] = "question"
+                content = content.replace("[MODE: question]", "").strip()
+            else:
+                state["recommended_mode"] = None
+                
+            state["current_question"] = content
         else:
             state["current_question"] = "I apologize, I'm having trouble processing that query properly. Could you rephrase it?"
             state["recommended_mode"] = None
@@ -111,17 +119,25 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             intro = f"Patient Info: {json.dumps(patient_info)}. Start the full treatment profile collection."
             messages.append(HumanMessage(content=intro))
             
-        structured_llm = llm.with_structured_output(AgentResponse)
-        response = structured_llm.invoke(messages)
+        response = llm.invoke(messages)
         
         if len(responses) >= 8:
             state["step"] = "root_cause"
             state["current_question"] = "Thank you for providing all the details. I am now analyzing your complete profile for root causes..."
             state["recommended_mode"] = None
         else:
-            if response:
-                state["current_question"] = response.message
-                state["recommended_mode"] = response.recommended_mode
+            if response and response.content:
+                content = response.content
+                if "[MODE: treatment]" in content:
+                    state["recommended_mode"] = "treatment"
+                    content = content.replace("[MODE: treatment]", "").strip()
+                elif "[MODE: question]" in content:
+                    state["recommended_mode"] = "question"
+                    content = content.replace("[MODE: question]", "").strip()
+                else:
+                    state["recommended_mode"] = None
+                    
+                state["current_question"] = content
             else:
                 state["current_question"] = "Could you please elaborate on that?"
                 state["recommended_mode"] = None
