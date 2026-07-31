@@ -7,6 +7,7 @@ import { naturopathyAPI } from '../services/api';
 import AssessmentProgress from './AssessmentProgress';
 import RecommendationCard from './RecommendationCard';
 import SafetyAlert from './SafetyAlert';
+import GeminiLoader from './GeminiLoader';
 
 export default function ChatInterface({ sessionId, user }) {
   const [messages, setMessages] = useState([]);
@@ -63,28 +64,74 @@ export default function ChatInterface({ sessionId, user }) {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
+    let assistantMessageAdded = false;
     
     try {
-      const response = await naturopathyAPI.sendMessage(activeSessionId, userMessage);
+      const stream = naturopathyAPI.streamMessage(activeSessionId, userMessage);
       
-      // Backend returns AssessmentResponse: { session_id, step, message, is_complete, report, safety_flags, need_practitioner }
-      if (response.message) {
-        setMessages(prev => [...prev, { role: 'assistant', content: response.message }]);
+      for await (const data of stream) {
+        if (data.chunk) {
+          if (!assistantMessageAdded) {
+             setIsTyping(false);
+             assistantMessageAdded = true;
+             setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+          }
+          
+          // Smooth the typing effect by appending character by character with a tiny delay
+          const chars = data.chunk.split('');
+          for (let i = 0; i < chars.length; i++) {
+             await new Promise(r => setTimeout(r, 8)); // 8ms per char
+             setMessages(prev => {
+               const newMessages = [...prev];
+               const lastMsg = { ...newMessages[newMessages.length - 1] };
+               lastMsg.content += chars[i];
+               newMessages[newMessages.length - 1] = lastMsg;
+               return newMessages;
+             });
+          }
+        }
+        
+        if (data.done && data.state) {
+          const response = data.state;
+          // Replace final text in case of disclaimers/mode stripping
+          if (response.message) {
+            if (!assistantMessageAdded) {
+                setMessages(prev => [...prev, { role: 'assistant', content: response.message }]);
+                assistantMessageAdded = true;
+                setIsTyping(false);
+            } else {
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastMsg = { ...newMessages[newMessages.length - 1] };
+                  lastMsg.content = response.message;
+                  newMessages[newMessages.length - 1] = lastMsg;
+                  return newMessages;
+                });
+            }
+          }
+          if (response.step) setStep(response.step);
+          if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
+          if (response.need_practitioner) setNeedsPractitioner(true);
+          if (response.is_complete) {
+            setIsComplete(true);
+            if (response.report) setReport(response.report);
+          }
+        }
       }
-      
-      if (response.step) setStep(response.step);
-      if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
-      if (response.need_practitioner) setNeedsPractitioner(true);
-      if (response.is_complete) {
-        setIsComplete(true);
-        if (response.report) setReport(response.report);
-      }
-      
     } catch(err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
-    } finally {
       setIsTyping(false);
+      if (!assistantMessageAdded) {
+         setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
+      } else {
+         setMessages(prev => {
+           const newMessages = [...prev];
+           const lastMsg = { ...newMessages[newMessages.length - 1] };
+           lastMsg.content += "\n\n*(Error connecting to network)*";
+           newMessages[newMessages.length - 1] = lastMsg;
+           return newMessages;
+         });
+      }
     }
   };
 
@@ -150,17 +197,12 @@ export default function ChatInterface({ sessionId, user }) {
           ))}
           
           {isTyping && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Leaf size={20} color="var(--cream)" />
               </div>
-              <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: 'var(--forest)', fontWeight: 500, fontSize: '0.9rem' }}>Loading...</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both' }}></div>
-                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}></div>
-                  <div style={{ width: 6, height: 6, background: 'var(--forest)', borderRadius: '50%', animation: 'typing-dot 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}></div>
-                </div>
+              <div className="glass-card" style={{ padding: '0 1rem' }}>
+                <GeminiLoader />
               </div>
             </div>
           )}
