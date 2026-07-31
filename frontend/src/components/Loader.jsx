@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function GeminiLoader() {
+export default function Loader() {
   return (
     <div className="gemini-loader-container">
       <div className="gemini-star-wrapper">

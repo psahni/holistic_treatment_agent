@@ -7,7 +7,7 @@ import { naturopathyAPI } from '../services/api';
 import AssessmentProgress from './AssessmentProgress';
 import RecommendationCard from './RecommendationCard';
 import SafetyAlert from './SafetyAlert';
-import GeminiLoader from './GeminiLoader';
+import Loader from './Loader';
 
 export default function ChatInterface({ sessionId, user }) {
   const [messages, setMessages] = useState([]);
@@ -202,7 +202,7 @@ export default function ChatInterface({ sessionId, user }) {
                 <Leaf size={20} color="var(--cream)" />
               </div>
               <div className="glass-card" style={{ padding: '0 1rem' }}>
-                <GeminiLoader />
+                <Loader />
               </div>
             </div>
           )}
