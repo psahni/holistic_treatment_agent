@@ -128,7 +128,7 @@ def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
             # we would need to yield from inside add_document_chunks or chunk the chunks.
             # For simplicity, we chunk them here in batches of 10.
             total_chunks = len(chunks_with_metadata)
-            batch_size = 10
+            batch_size = 100
             inserted = 0
             
             for i in range(0, total_chunks, batch_size):
