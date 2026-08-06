@@ -5,16 +5,30 @@ Performs targeted web searches restricted to authentic AYUSH, medical, and Natur
 """
 
 import logging
+import os
+import yaml
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-TRUSTED_DOMAINS = [
-    "ayush.gov.in",
-    "ninpune.ayush.gov.in",
-    "ccrn.res.in",
-    "ncbi.nlm.nih.gov"
-]
+def load_trusted_domains() -> List[str]:
+    """Loads trusted domains from resources.yaml."""
+    yaml_path = os.path.join(os.path.dirname(__file__), '..', 'resources.yaml')
+    try:
+        with open(yaml_path, 'r') as f:
+            data = yaml.safe_load(f)
+            return data.get('trusted_domains', [])
+    except Exception as e:
+        logger.error(f"Failed to load resources.yaml: {e}")
+        # Fallback to defaults if file is missing/broken
+        return [
+            "ayush.gov.in",
+            "ninpune.ayush.gov.in",
+            "ccrn.res.in",
+            "ncbi.nlm.nih.gov"
+        ]
+
+TRUSTED_DOMAINS = load_trusted_domains()
 
 def search_authentic_web(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
     """Performs a web search using ddgs, querying AYUSH and medical references."""

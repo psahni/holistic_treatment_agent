@@ -1,0 +1,6 @@
+# Add new domains here to expand the AI's search resources.
+trusted_domains:
+  - "ayush.gov.in"
+  - "ninpune.ayush.gov.in"
+  - "ccrn.res.in"
+  - "ncbi.nlm.nih.gov"
