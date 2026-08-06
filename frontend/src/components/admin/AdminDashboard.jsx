@@ -124,9 +124,12 @@ export default function AdminDashboard({ onLogout }) {
       const data = await res.json();
       if (res.ok) {
         setSearchResults(data.results || []);
+      } else {
+        alert(data.detail || "Search failed: Rate limit exceeded or server error.");
       }
     } catch (err) {
       console.error(err);
+      alert("Search failed: Network error");
     } finally {
       setSearching(false);
     }
