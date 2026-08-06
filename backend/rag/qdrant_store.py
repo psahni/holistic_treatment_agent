@@ -136,7 +136,7 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
             )
             hits = res.points
         else:
-            hits = client.search(
+            hits = client.search(  # type: ignore
                 collection_name=COLLECTION_NAME,
                 query_vector=query_vector,
                 limit=limit
@@ -144,7 +144,7 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
 
         results = []
         for hit in hits:
-            payload = hit.payload if hasattr(hit, "payload") else hit
+            payload = getattr(hit, "payload", {}) or {}
             score = getattr(hit, "score", 0.0)
             results.append({
                 "text": payload.get("text", ""),
