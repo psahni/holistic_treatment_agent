@@ -1,6 +1,8 @@
 from typing import TypedDict, List, Dict, Optional, Any
 
 class NaturopathyState(TypedDict):
+    vector_results: List[Dict[str, Any]]
+    retrieved_context: Optional[str]
     session_id: str
     mode: str
     recommended_mode: Optional[str]
@@ -29,6 +31,8 @@ def InitialState() -> NaturopathyState:
         "recommended_mode": None,
         "step": "intake",
         "patient_info": {},
+        "retrieved_context": None,
+        "vector_results": [],
         "chief_complaints": [],
         "lifestyle_factors": {},
         "emotional_factors": {},
@@ -43,5 +47,5 @@ def InitialState() -> NaturopathyState:
         "user_responses": {},
         "assessment_complete": False,
         "final_report": {},
-        "error": None
+        "error": None,
     }

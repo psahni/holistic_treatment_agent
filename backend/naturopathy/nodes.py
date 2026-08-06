@@ -146,7 +146,22 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
         
     return state
 
-def root_cause_node(state: NaturopathyState) -> NaturopathyState:
+def qdrant_query_node(state: NaturopathyState) -> NaturopathyState:
+    """Retrieve hybrid context from Qdrant based on the latest user message.
+    Stores the retrieved text in `state['retrieved_context']`."""
+    latest_user_message = ""
+    for msg in reversed(state.get("conversation_history", [])):
+        if msg.get("role") == "user":
+            latest_user_message = msg.get("content", "")
+            break
+    if not latest_user_message:
+        latest_user_message = "Naturopathy health consultation and remedies"
+    hybrid = retrieve_hybrid_context(latest_user_message)
+    retrieved_context = hybrid.get("context_text", "")
+    state["retrieved_context"] = retrieved_context
+    return state
+
+
     llm = get_llm()
     responses = state.get("user_responses", {})
     history = state.get("conversation_history", [])
