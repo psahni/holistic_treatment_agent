@@ -98,8 +98,8 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
     # Filter valid text chunks first
     valid_chunks = [c for c in chunks if c.get("text", "").strip()]
     
-    # Process in batches of 50 to avoid rate limits
-    batch_size = 50
+    # Process in batches of 200 to avoid rate limits
+    batch_size = 200
     for i in range(0, len(valid_chunks), batch_size):
         batch = valid_chunks[i:i + batch_size]
         texts = [c.get("text", "") for c in batch]
