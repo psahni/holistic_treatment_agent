@@ -15,7 +15,8 @@ from typing import List, Dict, Any, Generator
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pypdf import PdfReader
-from rag.qdrant_store import add_document_chunks, get_qdrant_client
+import hashlib
+from rag.qdrant_store import add_document_chunks, get_qdrant_client, get_document_hash, delete_document_by_source
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ingest_docs")
@@ -71,6 +72,22 @@ def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
     
     yield json.dumps({"status": "starting", "message": f"Starting ingestion for {file_name}..."}) + "\n"
     
+    # 1. Compute file hash
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    current_hash = sha256_hash.hexdigest()
+    
+    # 2. Check if already ingested with same hash
+    existing_hash = get_document_hash(file_name)
+    if existing_hash == current_hash:
+        yield json.dumps({"status": "complete", "progress": 100, "message": f"{file_name} is already up to date in Vector DB."}) + "\n"
+        return
+    elif existing_hash is not None:
+        yield json.dumps({"status": "starting", "message": f"{file_name} was updated. Deleting old embeddings..."}) + "\n"
+        delete_document_by_source(file_name)
+    
     chunks_with_metadata = []
     try:
         reader = PdfReader(file_path)
@@ -112,7 +129,7 @@ def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
             
             for i in range(0, total_chunks, batch_size):
                 batch = chunks_with_metadata[i:i+batch_size]
-                count = add_document_chunks(batch)
+                count = add_document_chunks(batch, file_hash=current_hash)
                 inserted += count
                 progress = 55 + round((inserted / total_chunks) * 45) # 55-100% for embedding
                 yield json.dumps({
