@@ -88,7 +88,7 @@ def get_embedding(text: str) -> List[float]:
     return [0.0] * VECTOR_SIZE
 
 
-def add_document_chunks(chunks: List[Dict[str, Any]]) -> int:
+def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "") -> int:
     """Inserts text chunks with metadata into Qdrant."""
     client = get_qdrant_client()
     points = []
@@ -105,7 +105,8 @@ def add_document_chunks(chunks: List[Dict[str, Any]]) -> int:
             "source": chunk.get("source", "unknown"),
             "page": chunk.get("page", 1),
             "title": chunk.get("title", "Naturopathy Guide"),
-            "category": chunk.get("category", "general")
+            "category": chunk.get("category", "general"),
+            "file_hash": file_hash
         }
 
         points.append(PointStruct(id=point_id, vector=vector, payload=payload))
@@ -193,3 +194,28 @@ def delete_document_by_source(filename: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to delete document {filename} from Qdrant: {e}")
         return False
+
+def get_document_hash(filename: str) -> Optional[str]:
+    """Retrieves the file hash for a given document if it exists in Qdrant."""
+    try:
+        client = get_qdrant_client()
+        res = client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="source",
+                        match=MatchValue(value=filename)
+                    )
+                ]
+            ),
+            limit=1,
+            with_payload=True
+        )
+        points, _ = res
+        if points and hasattr(points[0], 'payload'):
+            return points[0].payload.get("file_hash")
+        return None
+    except Exception as e:
+        logger.warning(f"Could not retrieve hash for {filename}: {e}")
+        return None
