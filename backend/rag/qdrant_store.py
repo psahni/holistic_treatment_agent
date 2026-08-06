@@ -172,8 +172,8 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
 
         return results
     except Exception as e:
-        logger.warning(f"Qdrant vector search failed: {e}")
-        return []
+        logger.error(f"Qdrant vector search failed: {e}")
+        raise e
 
 def get_document_chunk_count(filename: str) -> int:
     """Returns the number of chunks stored in Qdrant for a specific document."""
