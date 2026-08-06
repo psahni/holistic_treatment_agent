@@ -59,7 +59,7 @@ def build_naturopathy_graph():
     graph.add_edge('guardrail', END)
     
     # Add edge from qdrant_query to END (or back to intake if needed)
-    graph.add_edge('qdrant_query', END)
+    graph.add_edge('qdrant_query', 'intake')
     return graph.compile()
 
 naturopathy_graph = build_naturopathy_graph()

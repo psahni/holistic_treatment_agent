@@ -59,14 +59,15 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
                 "The user just greeted you or stated they want to ask a question. Simply respond politely and invite them to ask their question. DO NOT provide remedies or root cause analysis."
             )
         else:
-            hybrid = retrieve_hybrid_context(latest_user_message)
-            retrieved_context = hybrid.get("context_text", "")
-            
-            system_instruction = (
-                SYSTEM_PROMPT + "\n\n" + 
-                QUESTION_MODE_PROMPT + "\n\n" +
-                f"RETRIEVED AUTHENTIC REFERENCE CONTEXT:\n{retrieved_context}"
-            )
+            retrieved_context = state.get('retrieved_context')
+            if retrieved_context:
+                system_instruction = (
+                    SYSTEM_PROMPT + "\n\n" +
+                    QUESTION_MODE_PROMPT + "\n\n" +
+                    f"RETRIEVED AUTHENTIC REFERENCE CONTEXT:\n{retrieved_context}"
+                )
+            else:
+                system_instruction = SYSTEM_PROMPT + "\n\n" + QUESTION_MODE_PROMPT
         
         messages = [SystemMessage(content=system_instruction)]
         
@@ -161,16 +162,17 @@ def qdrant_query_node(state: NaturopathyState) -> NaturopathyState:
     state["retrieved_context"] = retrieved_context
     return state
 
-
+def root_cause_node(state: NaturopathyState) -> NaturopathyState:
+    """Analyse collected patient data and identify root causes."""
     llm = get_llm()
     responses = state.get("user_responses", {})
     history = state.get("conversation_history", [])
-    
+
     messages = [
         SystemMessage(content=SYSTEM_PROMPT + "\n\n" + ROOT_CAUSE_PROMPT),
         HumanMessage(content=f"Patient Data: {json.dumps(responses)}\nHistory: {json.dumps(history)}")
     ]
-    
+
     response = llm.invoke(messages)
     try:
         content = response.content
@@ -184,7 +186,7 @@ def qdrant_query_node(state: NaturopathyState) -> NaturopathyState:
         logger.warning(f"Failed to parse root causes JSON: {e}")
         state["error"] = f"Failed to parse root causes: {str(e)}"
         state["root_causes"] = []
-        
+
     state["step"] = "treatment_design"
     return state
 
