@@ -188,7 +188,7 @@ def get_document_chunk_count(filename: str) -> int:
         return count_res.count
     except Exception as e:
         logger.error(f"Failed to count chunks for {filename}: {e}")
-        return 0
+        return -1
 
 def delete_document_by_source(filename: str) -> bool:
     """Deletes all chunks associated with a specific document from Qdrant."""
