@@ -66,8 +66,8 @@ def ensure_collection_exists(client: QdrantClient):
         logger.warning(f"Error checking/creating Qdrant collection: {e}")
 
 
-def get_embedding(text: str) -> List[float]:
-    """Generates 3072-dim vector embedding using Google's models/gemini-embedding-001 model with rate-limit retry."""
+def get_embeddings(texts: List[str]) -> List[List[float]]:
+    """Generates 3072-dim vector embeddings in batches using gemini-embedding-001 with rate-limit retry."""
     import time
     max_retries = 3
     for attempt in range(max_retries):
@@ -75,19 +75,19 @@ def get_embedding(text: str) -> List[float]:
             gclient = get_genai_client()
             res = gclient.models.embed_content(
                 model="models/gemini-embedding-001",
-                contents=text
+                contents=texts
             )
-            time.sleep(0.2)  # Mild rate-limit throttle
-            return res.embeddings[0].values
+            time.sleep(1.0)  # Rate-limit throttle for batches
+            return [e.values for e in res.embeddings]
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                wait_time = (2 ** attempt) + 1
+                wait_time = (2 ** attempt) + 3
                 logger.warning(f"Gemini embedding rate-limited. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})...")
                 time.sleep(wait_time)
             else:
-                logger.error(f"Error generating embedding: {e}")
+                logger.error(f"Error generating embeddings: {e}")
                 break
-    return [0.0] * VECTOR_SIZE
+    return [[0.0] * VECTOR_SIZE for _ in texts]
 
 
 def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_id: str = "") -> int:
@@ -95,24 +95,29 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
     client = get_qdrant_client()
     points = []
 
-    for chunk in chunks:
-        text = chunk.get("text", "")
-        if not text.strip():
-            continue
-
-        vector = get_embedding(text)
-        point_id = str(uuid.uuid4())
-        payload = {
-            "text": text,
-            "source": chunk.get("source", "unknown"),
-            "page": chunk.get("page", 1),
-            "title": chunk.get("title", "Naturopathy Guide"),
-            "category": chunk.get("category", "general"),
-            "file_hash": file_hash,
-            "doc_id": doc_id
-        }
-
-        points.append(PointStruct(id=point_id, vector=vector, payload=payload))
+    # Filter valid text chunks first
+    valid_chunks = [c for c in chunks if c.get("text", "").strip()]
+    
+    # Process in batches of 50 to avoid rate limits
+    batch_size = 50
+    for i in range(0, len(valid_chunks), batch_size):
+        batch = valid_chunks[i:i + batch_size]
+        texts = [c.get("text", "") for c in batch]
+        
+        vectors = get_embeddings(texts)
+        
+        for chunk, vector in zip(batch, vectors):
+            point_id = str(uuid.uuid4())
+            payload = {
+                "text": chunk.get("text", ""),
+                "source": chunk.get("source", "unknown"),
+                "page": chunk.get("page", 1),
+                "title": chunk.get("title", "Naturopathy Guide"),
+                "category": chunk.get("category", "general"),
+                "file_hash": file_hash,
+                "doc_id": doc_id
+            }
+            points.append(PointStruct(id=point_id, vector=vector, payload=payload))
 
     if points:
         client.upsert(collection_name=COLLECTION_NAME, points=points)
@@ -126,7 +131,7 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
     start_time = time.time()
     try:
         client = get_qdrant_client()
-        query_vector = get_embedding(query)
+        query_vector = get_embeddings([query])[0]
 
         if hasattr(client, "query_points"):
             res = client.query_points(
