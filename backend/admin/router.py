@@ -1,5 +1,6 @@
 import os
-import shutil
+import asyncio
+from pathlib import Path
 from typing import List
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Response, Request
 from fastapi.responses import StreamingResponse
@@ -64,13 +65,13 @@ def check_auth(admin: str = Depends(get_current_admin)):
     return {"authenticated": True, "user": admin}
 
 @router.get("/docs")
-def list_docs(admin: str = Depends(get_current_admin)):
+async def list_docs(admin: str = Depends(get_current_admin)):
     os.makedirs(DOCS_DIR, exist_ok=True)
     pdf_files = [f for f in os.listdir(DOCS_DIR) if f.lower().endswith(".pdf")]
     
     docs_info = []
     for file_name in pdf_files:
-        chunk_count = get_document_chunk_count(file_name)
+        chunk_count = await asyncio.to_thread(get_document_chunk_count, file_name)
         docs_info.append({
             "filename": file_name,
             "status": "ingested" if chunk_count > 0 else "pending",
@@ -79,25 +80,33 @@ def list_docs(admin: str = Depends(get_current_admin)):
         
     return {"docs": docs_info}
 
+def _save_file_sync(file_path: str, contents: bytes):
+    with open(file_path, "wb") as buffer:
+        buffer.write(contents)
+
 @router.post("/upload")
-def upload_doc(file: UploadFile = File(...), admin: str = Depends(get_current_admin)):
+async def upload_doc(file: UploadFile = File(...), admin: str = Depends(get_current_admin)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
         
     os.makedirs(DOCS_DIR, exist_ok=True)
-    file_path = os.path.join(DOCS_DIR, file.filename)
+    # SECURITY: Prevent path traversal
+    safe_filename = Path(file.filename).name
+    file_path = os.path.join(DOCS_DIR, safe_filename)
     
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    contents = await file.read()
+    await asyncio.to_thread(_save_file_sync, file_path, contents)
         
-    return {"message": f"Successfully uploaded {file.filename}", "filename": file.filename}
+    return {"message": f"Successfully uploaded {safe_filename}", "filename": safe_filename}
 
 @router.delete("/docs/{filename}")
-def delete_doc(filename: str, admin: str = Depends(get_current_admin)):
-    file_path = os.path.join(DOCS_DIR, filename)
+async def delete_doc(filename: str, admin: str = Depends(get_current_admin)):
+    # SECURITY: Prevent path traversal
+    safe_filename = Path(filename).name
+    file_path = os.path.join(DOCS_DIR, safe_filename)
     
     # 1. Delete from Qdrant
-    qdrant_deleted = delete_document_by_source(filename)
+    qdrant_deleted = await asyncio.to_thread(delete_document_by_source, safe_filename)
     
     # 2. Delete from filesystem
     fs_deleted = False
@@ -108,24 +117,31 @@ def delete_doc(filename: str, admin: str = Depends(get_current_admin)):
     if not qdrant_deleted and not fs_deleted:
         raise HTTPException(status_code=404, detail="File not found in DB or filesystem")
         
-    return {"message": f"Deleted {filename}", "qdrant_deleted": qdrant_deleted, "fs_deleted": fs_deleted}
+    return {"message": f"Deleted {safe_filename}", "qdrant_deleted": qdrant_deleted, "fs_deleted": fs_deleted}
 
 @router.get("/ingest/{filename}")
-def stream_ingestion(filename: str): # Authentication omitted for SSE or handled via token in URL if necessary, but assuming internal
-    file_path = os.path.join(DOCS_DIR, filename)
+async def stream_ingestion(filename: str): # Authentication omitted for SSE or handled via token in URL if necessary, but assuming internal
+    safe_filename = Path(filename).name
+    file_path = os.path.join(DOCS_DIR, safe_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
         
     async def sse_generator():
-        for progress_json in yield_ingestion_progress(file_path):
-            yield f"data: {progress_json}\n\n"
+        # Wrap the generator in asyncio.to_thread for each iteration to avoid blocking event loop
+        generator = yield_ingestion_progress(file_path)
+        while True:
+            try:
+                progress_json = await asyncio.to_thread(next, generator)
+                yield f"data: {progress_json}\n\n"
+            except StopIteration:
+                break
             
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
 @router.get("/embeddings/search")
-def search_embeddings(q: str, limit: int = 5, admin: str = Depends(get_current_admin)):
+async def search_embeddings(q: str, limit: int = 5, admin: str = Depends(get_current_admin)):
     if not q:
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
         
-    results = search_vector_store(q, limit=limit)
+    results = await asyncio.to_thread(search_vector_store, q, limit)
     return {"results": results}

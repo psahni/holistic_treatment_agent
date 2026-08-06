@@ -1,6 +1,8 @@
 import os
 import uuid
 import logging
+import json
+import time
 from typing import List, Dict, Any, Optional
 
 from qdrant_client import QdrantClient
@@ -121,6 +123,7 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
 
 def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
     """Searches Qdrant for book chunks relevant to the query."""
+    start_time = time.time()
     try:
         client = get_qdrant_client()
         query_vector = get_embedding(query)
@@ -148,8 +151,20 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
                 "source": payload.get("source", ""),
                 "page": payload.get("page", 1),
                 "title": payload.get("title", ""),
-                "score": round(score, 4)
+                "category": payload.get("category", ""),
+                "score": score
             })
+
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info(json.dumps({
+            "event": "qdrant_search",
+            "collection": COLLECTION_NAME,
+            "query": query,
+            "k": limit,
+            "hits": len(results),
+            "latency_ms": latency_ms
+        }))
+
         return results
     except Exception as e:
         logger.warning(f"Qdrant vector search failed: {e}")
