@@ -88,7 +88,7 @@ def get_embedding(text: str) -> List[float]:
     return [0.0] * VECTOR_SIZE
 
 
-def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "") -> int:
+def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_id: str = "") -> int:
     """Inserts text chunks with metadata into Qdrant."""
     client = get_qdrant_client()
     points = []
@@ -106,7 +106,8 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "") -> in
             "page": chunk.get("page", 1),
             "title": chunk.get("title", "Naturopathy Guide"),
             "category": chunk.get("category", "general"),
-            "file_hash": file_hash
+            "file_hash": file_hash,
+            "doc_id": doc_id
         }
 
         points.append(PointStruct(id=point_id, vector=vector, payload=payload))

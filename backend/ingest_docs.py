@@ -9,6 +9,7 @@ import os
 import sys
 import logging
 import json
+import uuid
 from typing import List, Dict, Any, Generator
 
 # Ensure backend root is in import path
@@ -79,6 +80,9 @@ def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
             sha256_hash.update(byte_block)
     current_hash = sha256_hash.hexdigest()
     
+    # Generate stable doc_id based on filename
+    doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, file_name))
+    
     # 2. Check if already ingested with same hash
     existing_hash = get_document_hash(file_name)
     if existing_hash == current_hash:
@@ -129,7 +133,7 @@ def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
             
             for i in range(0, total_chunks, batch_size):
                 batch = chunks_with_metadata[i:i+batch_size]
-                count = add_document_chunks(batch, file_hash=current_hash)
+                count = add_document_chunks(batch, file_hash=current_hash, doc_id=doc_id)
                 inserted += count
                 progress = 55 + round((inserted / total_chunks) * 45) # 55-100% for embedding
                 yield json.dumps({
