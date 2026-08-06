@@ -72,9 +72,17 @@ async def list_docs(admin: str = Depends(get_current_admin)):
     docs_info = []
     for file_name in pdf_files:
         chunk_count = await asyncio.to_thread(get_document_chunk_count, file_name)
+        
+        status = "pending"
+        if chunk_count > 0:
+            status = "ingested"
+        elif chunk_count < 0:
+            status = "db_error"
+            chunk_count = 0
+            
         docs_info.append({
             "filename": file_name,
-            "status": "ingested" if chunk_count > 0 else "pending",
+            "status": status,
             "chunks": chunk_count
         })
         

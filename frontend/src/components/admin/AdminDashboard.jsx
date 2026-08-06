@@ -181,7 +181,7 @@ export default function AdminDashboard({ onLogout }) {
                     <tr key={doc.filename}>
                       <td>{doc.filename}</td>
                       <td>
-                        <span className={`status-badge ${doc.status === 'ingested' ? 'success' : 'pending'}`}>
+                        <span className={`status-badge ${doc.status === 'ingested' ? 'success' : (doc.status === 'db_error' ? 'danger' : 'pending')}`}>
                           {doc.status}
                         </span>
                       </td>
