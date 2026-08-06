@@ -86,8 +86,8 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
                 time.sleep(wait_time)
             else:
                 logger.error(f"Error generating embeddings: {e}")
-                break
-    return [[0.0] * VECTOR_SIZE for _ in texts]
+                raise e
+    raise Exception("Max retries exceeded for Gemini embedding API")
 
 
 def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_id: str = "") -> int:
