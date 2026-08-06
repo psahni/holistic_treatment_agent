@@ -244,7 +244,7 @@ export default function AdminDashboard({ onLogout }) {
                 className="search-input"
               />
               <button type="submit" className="admin-btn-primary" disabled={searching}>
-                <Search size={16} />
+                {searching ? <RefreshCw size={16} className="spin-icon" /> : <Search size={16} />}
               </button>
             </form>
 
