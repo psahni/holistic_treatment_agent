@@ -8,7 +8,8 @@ chunks text into semantic sections, and indexes them into Qdrant.
 import os
 import sys
 import logging
-from typing import List, Dict, Any
+import json
+from typing import List, Dict, Any, Generator
 
 # Ensure backend root is in import path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -62,6 +63,75 @@ def parse_pdf(file_path: str) -> List[Dict[str, Any]]:
         logger.error(f"Failed to parse PDF {file_name}: {e}")
 
     return chunks_with_metadata
+
+
+def yield_ingestion_progress(file_path: str) -> Generator[str, None, None]:
+    """Generator that parses a PDF and yields progress updates for SSE, then embeds."""
+    file_name = os.path.basename(file_path)
+    
+    yield json.dumps({"status": "starting", "message": f"Starting ingestion for {file_name}..."}) + "\n"
+    
+    chunks_with_metadata = []
+    try:
+        reader = PdfReader(file_path)
+        total_pages = len(reader.pages)
+        
+        for page_num, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            if text.strip():
+                page_chunks = chunk_text(text)
+                for chunk in page_chunks:
+                    chunks_with_metadata.append({
+                        "text": chunk,
+                        "source": file_name,
+                        "page": page_num,
+                        "title": file_name.replace(".pdf", "").replace("_", " ").title(),
+                        "category": "naturopathy_book"
+                    })
+            
+            # Yield progress every page
+            yield json.dumps({
+                "status": "parsing", 
+                "progress": round(page_num / total_pages * 50), # 0-50% for parsing
+                "message": f"Parsed page {page_num}/{total_pages}..."
+            }) + "\n"
+            
+        yield json.dumps({
+            "status": "embedding", 
+            "progress": 55,
+            "message": f"Extracted {len(chunks_with_metadata)} chunks. Starting embedding..."
+        }) + "\n"
+        
+        if chunks_with_metadata:
+            # Note: add_document_chunks could be slow. To be truly streaming during embedding, 
+            # we would need to yield from inside add_document_chunks or chunk the chunks.
+            # For simplicity, we chunk them here in batches of 10.
+            total_chunks = len(chunks_with_metadata)
+            batch_size = 10
+            inserted = 0
+            
+            for i in range(0, total_chunks, batch_size):
+                batch = chunks_with_metadata[i:i+batch_size]
+                count = add_document_chunks(batch)
+                inserted += count
+                progress = 55 + round((inserted / total_chunks) * 45) # 55-100% for embedding
+                yield json.dumps({
+                    "status": "embedding",
+                    "progress": progress,
+                    "message": f"Embedded {inserted}/{total_chunks} chunks..."
+                }) + "\n"
+                
+            yield json.dumps({
+                "status": "complete",
+                "progress": 100,
+                "message": f"Successfully ingested {inserted} chunks into Qdrant!"
+            }) + "\n"
+        else:
+            yield json.dumps({"status": "complete", "progress": 100, "message": "No text found in PDF."}) + "\n"
+            
+    except Exception as e:
+        logger.error(f"Failed to ingest {file_name}: {e}")
+        yield json.dumps({"status": "error", "message": f"Error: {str(e)}"}) + "\n"
 
 
 def run_ingestion():

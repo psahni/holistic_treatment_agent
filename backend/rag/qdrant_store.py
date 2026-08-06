@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 from google import genai
 
 from config import get_settings
@@ -152,3 +152,44 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Qdrant vector search failed: {e}")
         return []
+
+def get_document_chunk_count(filename: str) -> int:
+    """Returns the number of chunks stored in Qdrant for a specific document."""
+    try:
+        client = get_qdrant_client()
+        count_res = client.count(
+            collection_name=COLLECTION_NAME,
+            count_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="source",
+                        match=MatchValue(value=filename)
+                    )
+                ]
+            )
+        )
+        return count_res.count
+    except Exception as e:
+        logger.error(f"Failed to count chunks for {filename}: {e}")
+        return 0
+
+def delete_document_by_source(filename: str) -> bool:
+    """Deletes all chunks associated with a specific document from Qdrant."""
+    try:
+        client = get_qdrant_client()
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="source",
+                        match=MatchValue(value=filename)
+                    )
+                ]
+            )
+        )
+        logger.info(f"Successfully deleted all chunks for {filename} from Qdrant.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete document {filename} from Qdrant: {e}")
+        return False

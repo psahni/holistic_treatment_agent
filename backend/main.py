@@ -25,7 +25,9 @@ app = FastAPI(title="Naturopathy Health Triage Agent", lifespan=lifespan)
 settings = get_settings()
 
 from auth.router import router as auth_router
+from admin.router import router as admin_router
 app.include_router(auth_router)
+app.include_router(admin_router, prefix="/api/admin")
 
 app.add_middleware(
     CORSMiddleware,
