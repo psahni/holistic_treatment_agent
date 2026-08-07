@@ -124,7 +124,7 @@
 - For each issue:
 
   ````md
-  ### [File: `tests/checkout.spec.ts`] Test: “user can complete checkout”
+  ### [File: `frontend/playwright/checkout.spec.ts`] Test: “user can complete checkout”
 
   - **Issue**: Uses `page.waitForTimeout(5000)` after clicking “Place order”.
   - **Why**: Hard waits cause flakiness and slow tests.
@@ -158,7 +158,7 @@
 
 ```text
 /playwright_review
-Review all E2E tests in `tests/e2e/**/*.spec.ts`.
+Review all E2E tests in `frontend/playwright/**/*.spec.ts`.
 Focus on locator quality, flakiness, and alignment with our LangGraph + Vertex AI flows.
 ```
 
@@ -166,5 +166,5 @@ or
 
 ```text
 /test_review
-Review `tests/checkout.spec.ts` and suggest concrete refactors to reduce flakiness and improve clarity.
+Review `frontend/playwright/checkout.spec.ts` and suggest concrete refactors to reduce flakiness and improve clarity.
 ```
