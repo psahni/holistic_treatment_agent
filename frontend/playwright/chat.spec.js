@@ -1,75 +1,95 @@
 const { test, expect } = require('@playwright/test');
 
+// Page Object Model representing the Naturopathy Chat Page
+class NaturoChatPage {
+  constructor(page) {
+    this.page = page;
+    this.heading = page.getByRole('heading', { level: 1 });
+    this.startJourneyBtn = page.getByRole('button', { name: /start your healing journey/i });
+    this.chatInput = page.getByPlaceholder('Describe your symptoms in detail...');
+    this.assistantMessages = page.getByTestId('assistant-message');
+  }
+
+  async navigate() {
+    await this.page.goto('/');
+  }
+
+  async startSession() {
+    await this.startJourneyBtn.click();
+    await expect(this.assistantMessages.first()).toContainText('Welcome to NatureCure AI', { timeout: 15000 });
+  }
+
+  async sendQuery(query) {
+    await this.chatInput.fill(query);
+    await this.page.keyboard.press('Enter');
+  }
+
+  async waitForVisualHold() {
+    // Only pause on local runs to let human developer visually inspect the UI response
+    if (!process.env.CI) {
+      await this.page.waitForTimeout(2000);
+    }
+  }
+}
+
 test.describe('Naturopathy Agent Chat Interface', () => {
-  
-  test.beforeEach(async ({ page }) => {
-    // Navigate to local home page
-    await page.goto('/');
-  });
 
   test('should load landing page and start chat session directly', async ({ page }) => {
+    const chatPage = new NaturoChatPage(page);
+    await chatPage.navigate();
+    
     // 1. Verify landing page elements
-    await expect(page.locator('h1')).toContainText('Natural Healing.');
+    await expect(chatPage.heading).toContainText('Natural Healing.');
     
-    // 2. Click "Start Your Healing Journey" to initialize session
-    const startBtn = page.getByRole('button', { name: /start your healing journey/i });
-    await startBtn.click();
-    
-    // 3. Verify chat welcome loads
-    const firstMessage = page.getByTestId('assistant-message').first();
-    await expect(firstMessage).toContainText('Welcome to NatureCure AI', { timeout: 15000 });
+    // 2. Click journey button and verify welcome loads
+    await chatPage.startSession();
   });
 
   test('should handle simple queries in Question Mode and render remedies', async ({ page }) => {
-    const startBtn = page.getByRole('button', { name: /start your healing journey/i });
-    await startBtn.click();
+    const chatPage = new NaturoChatPage(page);
+    await chatPage.navigate();
+    await chatPage.startSession();
 
     // 1. Send simple symptom query
-    const chatInput = page.getByPlaceholder('Describe your symptoms in detail...');
-    await chatInput.fill('What is a simple natural remedy for minor hiccups?');
-    await page.keyboard.press('Enter');
+    await chatPage.sendQuery('What is a simple natural remedy for minor hiccups?');
 
-    // 2. Locate the last assistant response bubble via test-id
-    const assistantMessage = page.getByTestId('assistant-message').last();
-    
-    // 3. Assert it contains the remedy details (forces Playwright to wait for streaming response)
+    // 2. Assert it contains the remedy details (forces Playwright to wait for streaming response)
+    const assistantMessage = chatPage.assistantMessages.last();
     await expect(assistantMessage).toContainText(/water|hiccup|breath/i, { timeout: 30000 });
     
-    // 4. Pause for 2 seconds to let the user see the response on the UI before closing
-    await page.waitForTimeout(2000);
+    // 3. Pause for visual hold
+    await chatPage.waitForVisualHold();
   });
 
   test('should handle vague inputs by asking for clarification', async ({ page }) => {
-    const startBtn = page.getByRole('button', { name: /start your healing journey/i });
-    await startBtn.click();
+    const chatPage = new NaturoChatPage(page);
+    await chatPage.navigate();
+    await chatPage.startSession();
 
-    // Send vague query
-    const chatInput = page.getByPlaceholder('Describe your symptoms in detail...');
-    await chatInput.fill('I have pain and am sick');
-    await page.keyboard.press('Enter');
+    // 1. Send vague query
+    await chatPage.sendQuery('I have pain and am sick');
 
-    // Locate last assistant bubble and verify it asks for clarification
-    const assistantMessage = page.getByTestId('assistant-message').last();
+    // 2. Locate last assistant bubble and verify it asks for clarification
+    const assistantMessage = chatPage.assistantMessages.last();
     await expect(assistantMessage).toContainText(/describe|clarify|detail|more|symptom|where/i, { timeout: 30000 });
 
-    // Pause for 2 seconds to see
-    await page.waitForTimeout(2000);
+    // 3. Pause for visual hold
+    await chatPage.waitForVisualHold();
   });
 
   test('should recommend switching to Treatment Mode for severe chronic issues', async ({ page }) => {
-    const startBtn = page.getByRole('button', { name: /start your healing journey/i });
-    await startBtn.click();
+    const chatPage = new NaturoChatPage(page);
+    await chatPage.navigate();
+    await chatPage.startSession();
 
-    // Send severe chronic disease query
-    const chatInput = page.getByPlaceholder('Describe your symptoms in detail...');
-    await chatInput.fill('I have severe chronic autoimmune Hashimoto thyroiditis for last 5 years with extreme exhaustion');
-    await page.keyboard.press('Enter');
+    // 1. Send severe chronic disease query
+    await chatPage.sendQuery('I have severe chronic autoimmune Hashimoto thyroiditis for last 5 years with extreme exhaustion');
 
-    // Locate last assistant bubble and verify recommended switch suggestion
-    const assistantMessage = page.getByTestId('assistant-message').last();
+    // 2. Locate last assistant bubble and verify recommended switch suggestion
+    const assistantMessage = chatPage.assistantMessages.last();
     await expect(assistantMessage).toContainText(/treatment/i, { timeout: 30000 });
 
-    // Pause for 2 seconds to see
-    await page.waitForTimeout(2000);
+    // 3. Pause for visual hold
+    await chatPage.waitForVisualHold();
   });
 });
