@@ -10,12 +10,14 @@ Synthesizes both into a structured context block for Gemini LLM.
 
 import logging
 from typing import Dict, Any, List
+from functools import lru_cache
 
 from rag.qdrant_store import search_vector_store
 from rag.web_search import search_authentic_web
 
 logger = logging.getLogger(__name__)
 
+@lru_cache(maxsize=128)
 def retrieve_hybrid_context(user_query: str) -> Dict[str, Any]:
     """Retrieves context from both Qdrant Vector Store and Live Authentic Web Search."""
     logger.info(f"Retrieving hybrid context for query: '{user_query}'...")

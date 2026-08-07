@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     
     DATABASE_URL: str
     REDIS_URL: str = "redis://localhost:6379/0"
+    CACHE_LLM: bool = True
+    CACHE_TTL_SECONDS: int = 0  # 0 means infinite cache duration for testing
+
     
     QDRANT_URL: str = ""        # Set to Qdrant Cloud URL or http://localhost:6333 if using external Qdrant
     QDRANT_API_KEY: str = ""    # Set if using Qdrant Cloud
