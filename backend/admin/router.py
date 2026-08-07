@@ -9,7 +9,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 
 from config import get_settings
-from rag.qdrant_store import get_document_chunk_count, delete_document_by_source, search_vector_store
+from rag.qdrant_store import get_document_chunk_count, delete_document_by_source, search_vector_store, get_genai_client
 from ingest_docs import yield_ingestion_progress, DOCS_DIR
 
 router = APIRouter()
@@ -153,3 +153,69 @@ async def search_embeddings(q: str, limit: int = 5, admin: str = Depends(get_cur
         
     results = await asyncio.to_thread(search_vector_store, q, limit)
     return {"results": results}
+
+
+@router.get("/embeddings/search-with-answer")
+async def search_with_answer(q: str, limit: int = 5, admin: str = Depends(get_current_admin)):
+    """Vector search + LLM synthesis. Returns chunks and a generated answer."""
+    import time
+    if not q:
+        raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+
+    # 1. Retrieve relevant chunks
+    results = await asyncio.to_thread(search_vector_store, q, limit)
+
+    if not results:
+        return {"results": [], "answer": "No relevant information found in the knowledge base.", "llm_error": None}
+
+    # 2. Build context from chunks
+    context_parts = []
+    for i, hit in enumerate(results, 1):
+        context_parts.append(f"[{i}] (Source: {hit['source']}, Score: {hit['score']:.3f})\n{hit['text']}")
+    context = "\n\n".join(context_parts)
+
+    # 3. Call Gemini to synthesize answer (with 429 retry)
+    prompt = f"""You are a knowledgeable naturopathy assistant. Using ONLY the context below, answer the user's question concisely and accurately.
+If the context does not contain enough information, say so.
+
+Context:
+{context}
+
+Question: {q}
+
+Answer:"""
+
+    def _generate_answer() -> str:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                gclient = get_genai_client()
+                model_name = settings.GEMINI_MODEL if settings.USE_VERTEX_AI else f"models/{settings.GEMINI_MODEL}"
+                response = gclient.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    wait_time = (2 ** attempt) * 5
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Gemini generate_content rate-limited. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+        raise Exception("Rate limit: Gemini quota exceeded. Please wait a moment and try again.")
+
+    try:
+        answer = await asyncio.to_thread(_generate_answer)
+        return {"results": results, "answer": answer, "llm_error": None}
+    except Exception as e:
+        err_str = str(e)
+        # Return a clean user-facing error, not the raw 429 blob
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+            user_msg = "Gemini quota limit reached. Please wait ~20 seconds and try again."
+        else:
+            user_msg = f"LLM error: {err_str[:200]}"
+        return {"results": results, "answer": None, "llm_error": user_msg}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AdminDashboard({ onLogout }) {
   const [docs, setDocs] = useState([]);
@@ -7,7 +7,10 @@ export default function AdminDashboard({ onLogout }) {
   const [ingestionState, setIngestionState] = useState(null); // { filename, progress, message, status }
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [llmAnswer, setLlmAnswer] = useState('');
+  const [llmError, setLlmError] = useState('');
   const [searching, setSearching] = useState(false);
+  const [chunksOpen, setChunksOpen] = useState(false);
   
   const fileInputRef = useRef(null);
 
@@ -116,14 +119,20 @@ export default function AdminDashboard({ onLogout }) {
     e.preventDefault();
     if (!searchQuery) return;
     setSearching(true);
+    setLlmAnswer('');
+    setLlmError('');
+    setSearchResults([]);
+    setChunksOpen(false);
     
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/embeddings/search?q=${encodeURIComponent(searchQuery)}`, {
+      const res = await fetch(`http://localhost:8000/api/admin/embeddings/search-with-answer?q=${encodeURIComponent(searchQuery)}`, {
         credentials: 'include'
       });
       const data = await res.json();
       if (res.ok) {
         setSearchResults(data.results || []);
+        setLlmAnswer(data.answer || '');
+        setLlmError(data.llm_error || '');
       } else {
         alert(data.detail || "Search failed: Rate limit exceeded or server error.");
       }
@@ -252,18 +261,54 @@ export default function AdminDashboard({ onLogout }) {
             </form>
 
             <div className="search-results">
-              {searchResults.length === 0 ? (
+              {!llmAnswer && !llmError && searchResults.length === 0 ? (
                 <p className="text-center text-light mt-4">Search results will appear here.</p>
               ) : (
-                searchResults.map((hit, idx) => (
-                  <div key={idx} className="result-item">
-                    <div className="result-meta">
-                      <span className="source-tag">{hit.source} (Pg {hit.page})</span>
-                      <span className="score-tag">Score: {hit.score}</span>
+                <>
+                  {/* LLM Error Banner */}
+                  {llmError && (
+                    <div className="llm-error-banner">
+                      <span className="llm-error-icon">⚠</span> {llmError}
                     </div>
-                    <p className="result-text">{hit.text.substring(0, 150)}...</p>
-                  </div>
-                ))
+                  )}
+
+                  {/* LLM Answer */}
+                  {llmAnswer && (
+                    <div className="llm-answer-box">
+                      <div className="llm-answer-header">
+                        <span className="llm-answer-label">✦ AI Answer</span>
+                      </div>
+                      <p className="llm-answer-text">{llmAnswer}</p>
+                    </div>
+                  )}
+
+                  {/* Collapsible Chunks */}
+                  {searchResults.length > 0 && (
+                    <div className="chunks-section">
+                      <button
+                        className="chunks-toggle"
+                        onClick={() => setChunksOpen(o => !o)}
+                      >
+                        <span>Retrieved Chunks ({searchResults.length})</span>
+                        {chunksOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+
+                      {chunksOpen && (
+                        <div className="chunks-list">
+                          {searchResults.map((hit, idx) => (
+                            <div key={idx} className="result-item">
+                              <div className="result-meta">
+                                <span className="source-tag">{hit.source} (Pg {hit.page})</span>
+                                <span className="score-tag">Score: {hit.score}</span>
+                              </div>
+                              <p className="result-text">{hit.text.substring(0, 150)}...</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>

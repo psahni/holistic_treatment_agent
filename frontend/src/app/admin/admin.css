@@ -351,3 +351,85 @@
 .spin-icon {
   animation: spin 1.5s linear infinite;
 }
+
+/* LLM Answer Box */
+.llm-answer-box {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #86efac;
+  border-radius: var(--radius-sm);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.llm-answer-header {
+  margin-bottom: 0.75rem;
+}
+
+.llm-answer-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #16a34a;
+}
+
+.llm-answer-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* LLM Error Banner */
+.llm-error-banner {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+  color: #9a3412;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.llm-error-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* Collapsible Chunks */
+.chunks-section {
+  margin-top: 0.5rem;
+}
+
+.chunks-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-light);
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+.chunks-toggle:hover {
+  background: #f1f5f9;
+  color: var(--text-main);
+}
+
+.chunks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}

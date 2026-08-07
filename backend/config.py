@@ -3,8 +3,11 @@ from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # --- Google Cloud / Gemini ---
     GCP_PROJECT: str
-    GEMINI_API_KEY: str = ""
+    GCP_LOCATION: str = "us-central1"
+    USE_VERTEX_AI: bool = False       # True = Vertex AI (ADC auth, higher quotas); False = Gemini API key
+    GEMINI_API_KEY: str = ""          # Only required when USE_VERTEX_AI=False
     GEMINI_MODEL: str = "gemini-2.5-flash"
     MAX_TOKENS: int = 8192
     TEMPERATURE: float = 0.3

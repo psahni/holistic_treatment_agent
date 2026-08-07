@@ -82,12 +82,79 @@ Your job is to help me design, implement, test, and ship robust agents and suppo
 - Prefer JSON logs compatible with Cloud Logging / OpenTelemetry.
 
 ## Defaults
-- Default model: `gemini-2.0-flash` (or latest stable flash variant).
+- Default model: `gemini-2.5-flash` (or latest stable flash variant).
 - Default temperature: `0.2` for deterministic tasks, `0.7` for creative tasks.
 - Default language for explanations: English, technical, concise.
 
-## If I Say “Scaffold” or “Bootstrap”
+## If I Say "Scaffold" or "Bootstrap"
 - Produce a minimal but complete project structure:
   - Python: `src/`, `tests/`, `pyproject.toml`, basic LangGraph agent example.
   - Next.js: App Router skeleton, one page calling the agent API.
   - Basic Dockerfiles and `docker-compose.yml` for local dev (API + Qdrant).
+
+---
+
+## Custom Heuristics & Debug Commands
+
+### Command: `/diagnose`
+When I type `/diagnose` (or ask for a post-mortem of any fixed issue), output a clear, structured summary with these four specific sections:
+1. **What was the issue**: Explain the root cause and immediate symptoms.
+2. **What was the thought process to identify it**: Walk through the investigation steps, diagnostic commands run, and reasoning.
+3. **What was the fix**: The high-level solution to resolve the root cause.
+4. **What are the changes**: List the specific files modified, environment variable changes, and configuration updates.
+
+---
+
+### Command: `/debug-ai-quota`
+When I type `/debug-ai-quota` or report a `429`, `RESOURCE_EXHAUSTED`, `quota`, or `404 model not found` error on any Gemini/Vertex AI call, follow this diagnostic sequence:
+
+#### 1. Identify the Raw Error (Direct API Probe)
+Always run a direct script to bypass application retries or wrapper error-catching.
+```python
+from google import genai
+from config import get_settings
+s = get_settings()
+client = genai.Client(api_key=s.GEMINI_API_KEY)
+res = client.models.embed_content(model='models/gemini-embedding-001', contents=['test'])
+```
+- **"Credits depleted" message**: Billing issue on Google AI Studio. Switch to a new free-tier key/project.
+- **"429 rate limit"**: True RPM limit. Set up exponential backoff with higher wait times: `(2 ** attempt) * 5` (5s, 10s, 20s, 40s, 80s).
+- **"404 not found"**: Verify model availability in the region or check model name mapping.
+
+#### 2. Alphanumeric Project ID vs. Project Number
+Vertex AI endpoints require the alphanumeric GCP Project ID (e.g., `holistic-agent-503906`), NOT the numeric project number (e.g., `183840528497`).
+- Look up project ID:
+  ```powershell
+  gcloud projects describe <PROJECT_NUMBER> --format="value(projectId)"
+  ```
+
+#### 3. Model Accessibility Restrictions
+- **`gemini-embedding-001`**: Only available through the Google AI Studio Developer API. It is **not** available on Vertex AI. Always instantiate a separate `genai.Client` with `api_key` for embeddings.
+- **LLM/Generation**: Use Vertex AI via ADC (Application Default Credentials) when `USE_VERTEX_AI=true`.
+- **Probe Model Availability**: If a model fails to load, probe available options programmatically:
+  ```python
+  models = ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash']
+  for m in models:
+      try:
+          ChatVertexAI(model_name=m, project=s.GCP_PROJECT, max_retries=1).invoke("hi")
+          print(f"Working: {m}")
+          break
+      except Exception:
+          pass
+  ```
+
+#### 4. Run the E2E pipeline test
+```powershell
+python scratch_e2e_test.py
+```
+This tests: embedding → RAG retrieval → LLM response in one shot.
+
+### Known Rules for This Project
+| Rule | Detail |
+|---|---|
+| `gemini-embedding-001` is Gemini API-only | Never route through Vertex AI (`vertexai=True`) |
+| Vertex AI needs project string ID | `holistic-agent-503906`, not `183840528497` |
+| Working model on this project | `gemini-2.5-flash` (Vertex AI) |
+| Embedding client | Always `GEMINI_API_KEY`, 15 RPM free tier |
+| Generation client | Vertex AI via ADC when `USE_VERTEX_AI=true` |
+| ADC status check | `gcloud auth application-default print-access-token` |
