@@ -29,7 +29,7 @@ backend/evals/
 .deepeval/
 
 # Data & Models
-backend/data/docs/
+backend/data/
 backend/chroma_db/
 backend/qdrant_db/
 

@@ -18,13 +18,35 @@ COLLECTION_NAME = settings.QDRANT_COLLECTION
 VECTOR_SIZE = 3072  # gemini-embedding-001 vector dimension
 
 _client: Optional[QdrantClient] = None
-_genai_client: Optional[genai.Client] = None
+_genai_client: Optional[genai.Client] = None       # generation client
+_embedding_client: Optional[genai.Client] = None   # embedding client (always Gemini API key)
+
+
+def get_embedding_client() -> genai.Client:
+    """Always uses Gemini API key — gemini-embedding-001 is not available on Vertex AI."""
+    global _embedding_client
+    if _embedding_client is None:
+        logger.info("Initialising embedding client via Gemini API key (gemini-embedding-001)")
+        _embedding_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _embedding_client
+
 
 def get_genai_client() -> genai.Client:
+    """Generation client: Vertex AI (ADC) when USE_VERTEX_AI=true, else Gemini API key."""
     global _genai_client
     if _genai_client is None:
-        _genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        if settings.USE_VERTEX_AI:
+            logger.info(f"Initialising generation client via Vertex AI (project={settings.GCP_PROJECT}, location={settings.GCP_LOCATION})")
+            _genai_client = genai.Client(
+                vertexai=True,
+                project=settings.GCP_PROJECT,
+                location=settings.GCP_LOCATION,
+            )
+        else:
+            logger.info("Initialising generation client via Gemini API key")
+            _genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
     return _genai_client
+
 
 
 def get_qdrant_client() -> QdrantClient:
@@ -46,7 +68,20 @@ def get_qdrant_client() -> QdrantClient:
         local_db_path = os.path.join(os.path.dirname(__file__), "..", "data", "qdrant_db")
         os.makedirs(local_db_path, exist_ok=True)
         logger.info(f"Using local embedded Qdrant storage at {local_db_path}")
-        _client = QdrantClient(path=local_db_path)
+        try:
+            _client = QdrantClient(path=local_db_path)
+        except Exception as e:
+            if "lock" in str(e).lower() or "locked" in str(e).lower():
+                logger.critical(
+                    "\n" + "="*80 + "\n"
+                    "CRITICAL ERROR: Local Qdrant Database is Locked!\n\n"
+                    "This usually happens because another python process (like your active FastAPI server)\n"
+                    "is already connected to the embedded Qdrant DB file in backend/data/qdrant_db.\n\n"
+                    "Fix: Please stop the running FastAPI server/Uvicorn before running this script,\n"
+                    "or run Qdrant inside a Docker container (using QDRANT_URL in .env) to allow concurrent processes.\n"
+                    + "="*80 + "\n"
+                )
+            raise e
 
     ensure_collection_exists(_client)
     return _client
@@ -67,13 +102,16 @@ def ensure_collection_exists(client: QdrantClient):
 
 
 def get_embeddings(texts: List[str]) -> List[List[float]]:
-    """Generates 3072-dim vector embeddings in batches using gemini-embedding-001 with rate-limit retry."""
-    import time
-    max_retries = 3
+    """Generates 3072-dim vector embeddings using gemini-embedding-001 (Gemini API key, free tier 15 RPM).
+    
+    Note: gemini-embedding-001 is Gemini API-only — not available on Vertex AI.
+    Backoff schedule: 5s, 10s, 20s, 40s, 80s (exponential x5).
+    """
+    max_retries = 5
     for attempt in range(max_retries):
         try:
-            gclient = get_genai_client()
-            res = gclient.models.embed_content(
+            eclient = get_embedding_client()
+            res = eclient.models.embed_content(
                 model="models/gemini-embedding-001",
                 contents=texts
             )
@@ -81,12 +119,12 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
             return [e.values for e in res.embeddings]
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                wait_time = (2 ** attempt) + 3
+                wait_time = (2 ** attempt) * 5  # 5s, 10s, 20s, 40s, 80s
                 logger.warning(f"Gemini embedding rate-limited. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})...")
                 time.sleep(wait_time)
             else:
                 logger.error(f"Error generating embeddings: {e}")
-                raise e
+                raise
     raise Exception("Max retries exceeded for Gemini embedding API")
 
 
