@@ -22,6 +22,7 @@ class AssessmentResponse(BaseModel):
     session_id: str
     step: str
     message: str
+    recommended_mode: Optional[str] = None
     is_complete: bool
     report: Optional[Dict[str, Any]] = None
     safety_flags: List[str] = []

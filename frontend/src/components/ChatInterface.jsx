@@ -169,16 +169,18 @@ export default function ChatInterface({ sessionId, user }) {
                 </div>
               )}
               
-              <div style={{
-                maxWidth: '70%',
-                padding: '1rem 1.5rem',
-                borderRadius: '1.5rem',
-                borderBottomLeftRadius: msg.role === 'assistant' ? 0 : '1.5rem',
-                borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
-                background: msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)',
-                color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
-                boxShadow: 'var(--shadow-sm)',
-                lineHeight: 1.5
+              <div 
+                data-testid={msg.role === 'assistant' ? "assistant-message" : "user-message"}
+                style={{
+                  maxWidth: '70%',
+                  padding: '1rem 1.5rem',
+                  borderRadius: '1.5rem',
+                  borderBottomLeftRadius: msg.role === 'assistant' ? 0 : '1.5rem',
+                  borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
+                  background: msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)',
+                  color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
+                  boxShadow: 'var(--shadow-sm)',
+                  lineHeight: 1.5
               }}>
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}

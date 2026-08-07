@@ -22,7 +22,38 @@ from rag.hybrid_retriever import retrieve_hybrid_context
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+_cache_initialized = False
+
+def setup_llm_cache():
+    global _cache_initialized
+    if _cache_initialized:
+        return
+        
+    if not settings.CACHE_LLM:
+        return
+        
+    try:
+        from langchain_core.globals import set_llm_cache
+        from langchain_community.cache import RedisCache
+        from redis import Redis
+        
+        r = Redis.from_url(settings.REDIS_URL, socket_timeout=1.0)
+        r.ping()  # Check if Redis server is reachable
+        
+        ttl = settings.CACHE_TTL_SECONDS if settings.CACHE_TTL_SECONDS > 0 else None
+        set_llm_cache(RedisCache(redis_=r, ttl=ttl))
+        logger.info(f"LLM Caching enabled via Redis at {settings.REDIS_URL} (ttl={ttl})")
+    except Exception as e:
+        # Fallback to InMemoryCache if Redis fails
+        from langchain_core.globals import set_llm_cache
+        from langchain_community.cache import InMemoryCache
+        set_llm_cache(InMemoryCache())
+        logger.warning(f"Failed to connect to Redis for LLM cache ({e}). Falling back to InMemoryCache.")
+        
+    _cache_initialized = True
+
 def get_llm():
+    setup_llm_cache()
     return ChatVertexAI(
         model_name=settings.GEMINI_MODEL,
         temperature=settings.TEMPERATURE,
