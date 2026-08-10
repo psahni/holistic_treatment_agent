@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean, Foreign
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from config import get_settings
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class User(Base):
     phone_number = Column(String, unique=True, nullable=False)
     city = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     profiles = relationship("PatientProfile", back_populates="user")
     sessions = relationship("ConsultationSession", back_populates="user")
@@ -31,8 +31,8 @@ class PatientProfile(Base):
     gender = Column(String)
     region = Column(String)
     occupation = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     user = relationship("User", back_populates="profiles")
 
@@ -46,7 +46,7 @@ class ConsultationSession(Base):
     protocols_recommended = Column(JSON)
     completed_at = Column(DateTime, nullable=True)
     need_practitioner = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Practitioner portal integration
     status = Column(String, default='pending_review')  # 'pending_review', 'reviewed'
@@ -183,7 +183,7 @@ def save_completed_session(db, session_id: str, user_id: str, state: dict):
                 session_data=conv_history,
                 root_causes=state.get("root_causes", []),
                 protocols_recommended=state.get("final_report", {}),
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 need_practitioner=state.get("need_practitioner", False),
                 status="pending_review"
             )

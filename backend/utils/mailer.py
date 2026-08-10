@@ -3,7 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def send_prescription_email(to_email: str, patient_name: str, prescription_data:
           <div style="background-color: #f5f0e8; padding: 15px; border-radius: 6px; margin: 20px 0;">
             <h3 style="color: #1a3a2a; margin-top: 0;">📋 Case Summary</h3>
             <p style="margin: 5px 0;"><strong>Status:</strong> Approved & Prescribed</p>
-            <p style="margin: 5px 0;"><strong>Review Date:</strong> {datetime.utcnow().strftime('%Y-%m-%d')}</p>
+            <p style="margin: 5px 0;"><strong>Review Date:</strong> {datetime.now(timezone.utc).strftime('%Y-%m-%d')}</p>
           </div>
 
           <h3 style="color: #1a3a2a; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🌿 Approved Protocol</h3>
@@ -88,7 +88,7 @@ def send_prescription_email(to_email: str, patient_name: str, prescription_data:
     # Write to local file for dev/debug
     email_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "emails")
     os.makedirs(email_dir, exist_ok=True)
-    filename = f"email_{to_email}_{int(datetime.utcnow().timestamp())}.html"
+    filename = f"email_{to_email}_{int(datetime.now(timezone.utc).timestamp())}.html"
     file_path = os.path.join(email_dir, filename)
     try:
         with open(file_path, "w", encoding="utf-8") as f:
