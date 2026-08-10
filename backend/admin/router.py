@@ -248,6 +248,7 @@ def list_pending_cases(admin: str = Depends(get_current_admin), db: Session = De
                     
         cases.append({
             "session_id": str(s.id),
+            "case_id": s.case_id,
             "patient_name": user.name if user else "Unknown",
             "patient_email": user.email if user else "",
             "age": profile.age if profile else (user.age if user else 30),
@@ -276,6 +277,7 @@ def get_case_details(session_id: str, admin: str = Depends(get_current_admin), d
     
     return {
         "session_id": str(s.id),
+        "case_id": s.case_id,
         "patient_name": user.name if user else "Unknown",
         "patient_email": user.email if user else "",
         "age": profile.age if profile else (user.age if user else 30),

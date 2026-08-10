@@ -144,6 +144,7 @@ def test_treatment_mode_workflow_e2e():
         details = details_resp.json()
         assert details["patient_name"] == "Test Patient"
         assert details["status"] == "pending_review"
+        assert details.get("case_id") is not None
         
         # 6. Approve case and submit practitioner prescription
         approve_resp = client.post(

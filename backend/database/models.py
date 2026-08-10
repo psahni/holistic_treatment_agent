@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean, ForeignKey, create_engine, Uuid, text, inspect
+from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean, ForeignKey, create_engine, Uuid, text, inspect, Sequence
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from config import get_settings
 import uuid
@@ -52,6 +52,7 @@ class ConsultationSession(Base):
     status = Column(String, default='pending_review')  # 'pending_review', 'reviewed'
     doctor_prescription = Column(JSON, nullable=True)
     doctor_notes = Column(String, nullable=True)
+    case_id = Column(Integer, Sequence('consultation_sessions_case_id_seq'), unique=True)
     
     user = relationship("User", back_populates="sessions")
 
@@ -93,6 +94,12 @@ def run_migrations(bind_engine):
             if "doctor_notes" not in columns:
                 conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN doctor_notes VARCHAR"))
                 logger.info("Added doctor_notes column to consultation_sessions table")
+            if "case_id" not in columns:
+                if bind_engine.dialect.name == 'postgresql':
+                    conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN case_id SERIAL UNIQUE"))
+                else:
+                    conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN case_id INTEGER"))
+                logger.info("Added case_id column to consultation_sessions table")
     except Exception as e:
         logger.warning(f"Failed to auto-migrate consultation_sessions table: {e}")
 
