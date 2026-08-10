@@ -63,13 +63,15 @@ class NaturopathyAgent:
             "need_practitioner": state.get("need_practitioner", False)
         }
         
-    async def process_message_stream(self, session_id: str, message: str, state: dict, mode: str = None):
+    async def process_message_stream(self, session_id: str, message: str, state: dict, mode: str = None, user_id: str = None, db = None):
         """Process a user message and yield Server-Sent Events (SSE) chunks."""
         import json
         state['conversation_history'].append({"role": "user", "content": message})
         state['user_responses'][f"response_{len(state['user_responses'])}"] = message
         if mode:
             state['mode'] = mode
+        if user_id:
+            state['user_id'] = user_id
             
         final_state = None
         try:
@@ -91,6 +93,15 @@ class NaturopathyAgent:
                 if final_state.get("current_question"):
                     og_result = run_output_guardrails(final_state["current_question"], final_state)
                     final_state["current_question"] = og_result["safe_output"]
+                
+                if user_id:
+                    final_state["user_id"] = user_id
+                    
+                # Save to database if assessment is complete in treatment mode
+                if final_state.get("assessment_complete") and final_state.get("mode") == "treatment" and db and user_id:
+                    from database.models import save_completed_session
+                    save_completed_session(db, session_id, user_id, final_state)
+                    final_state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will email you the prescription once reviewed."
                     
                 from memory.session_store import session_store
                 session_store.save_session(session_id, final_state)

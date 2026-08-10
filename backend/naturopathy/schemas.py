@@ -16,7 +16,7 @@ class SymptomInput(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
-    mode: str = "question"
+    mode: Optional[str] = None
 
 class AssessmentResponse(BaseModel):
     session_id: str
