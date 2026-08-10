@@ -169,3 +169,29 @@ def test_treatment_mode_workflow_e2e():
         assert os.path.exists(email_dir)
         files = os.listdir(email_dir)
         assert any(test_email in f for f in files)
+        
+        # 9. Verify that patient can retrieve their case history and case details by case_id
+        history_resp = client.get("/api/naturo/history")
+        assert history_resp.status_code == 200
+        history_data = history_resp.json()["cases"]
+        assert len(history_data) == 1
+        case = history_data[0]
+        assert case["session_id"] == session_id
+        case_id = case["case_id"]
+        assert case_id is not None
+        
+        # Fetch detailed case by case_id
+        case_details_resp = client.get(f"/api/naturo/cases/{case_id}")
+        assert case_details_resp.status_code == 200
+        case_details = case_details_resp.json()
+        assert case_details["case_id"] == case_id
+        assert case_details["status"] == "reviewed"
+        assert "APPROVED: Steamed vegetables" in case_details["doctor_prescription"]["prescription_text"]
+        
+        # Check that unauthenticated requests are blocked
+        client.cookies.clear()
+        bad_history_resp = client.get("/api/naturo/history")
+        assert bad_history_resp.status_code == 401
+        
+        bad_details_resp = client.get(f"/api/naturo/cases/{case_id}")
+        assert bad_details_resp.status_code == 401

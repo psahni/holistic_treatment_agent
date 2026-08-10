@@ -15,7 +15,7 @@ from naturopathy.agent import NaturopathyAgent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
-from database.models import init_db, get_db, save_completed_session
+from database.models import init_db, get_db, save_completed_session, ConsultationSession, PatientProfile
 from auth.utils import get_optional_current_user
 
 @asynccontextmanager
@@ -169,3 +169,59 @@ def delete_session(id: str):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/api/naturo/history")
+def get_patient_history(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = get_optional_current_user(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    sessions = db.query(ConsultationSession).filter(
+        ConsultationSession.user_id == current_user.id
+    ).order_by(ConsultationSession.created_at.desc()).all()
+    
+    cases = []
+    for s in sessions:
+        cases.append({
+            "session_id": str(s.id),
+            "case_id": s.case_id,
+            "status": s.status,
+            "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S') if s.created_at else None,
+            "completed_at": s.completed_at.strftime('%Y-%m-%d %H:%M:%S') if s.completed_at else None,
+            "has_prescription": s.doctor_prescription is not None
+        })
+    return {"cases": cases}
+
+@app.get("/api/naturo/cases/{case_id}")
+def get_patient_case_details(
+    case_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = get_optional_current_user(request, db)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    s = db.query(ConsultationSession).filter(
+        ConsultationSession.case_id == case_id,
+        ConsultationSession.user_id == current_user.id
+    ).first()
+    
+    if not s:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    return {
+        "session_id": str(s.id),
+        "case_id": s.case_id,
+        "status": s.status,
+        "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S') if s.created_at else None,
+        "completed_at": s.completed_at.strftime('%Y-%m-%d %H:%M:%S') if s.completed_at else None,
+        "conversation_history": s.session_data,
+        "root_causes": s.root_causes,
+        "protocols_recommended": s.protocols_recommended,
+        "doctor_prescription": s.doctor_prescription,
+        "doctor_notes": s.doctor_notes
+    }
