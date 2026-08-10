@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uuid
 import logging
 import traceback
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ from naturopathy.agent import NaturopathyAgent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
-from database.models import init_db
+from database.models import init_db, get_db, save_completed_session
+from auth.utils import get_optional_current_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,9 +42,14 @@ app.add_middleware(
 agent = NaturopathyAgent()
 
 @app.post("/api/naturo/start", response_model=AssessmentResponse)
-async def start_session(symptom_input: SymptomInput):
+async def start_session(symptom_input: SymptomInput, request: Request, db: Session = Depends(get_db)):
     patient_info_dict = symptom_input.patient_info.model_dump() if symptom_input.patient_info else {}
     
+    # Enforce auth for treatment mode
+    current_user = get_optional_current_user(request, db)
+    if symptom_input.mode == "treatment" and not current_user:
+        raise HTTPException(status_code=401, detail="User must be logged in for treatment mode")
+        
     age = patient_info_dict.get("age")
     guardrail_result = run_input_guardrails(symptom_input.message, age)
     
@@ -53,6 +60,8 @@ async def start_session(symptom_input: SymptomInput):
     
     # Initialize session state via agent
     out_state = await agent.start_session(patient_info_dict, session_id, mode=symptom_input.mode)
+    if current_user:
+        out_state["user_id"] = str(current_user.id)
     
     # Process initial message if provided
     if symptom_input.message.strip():
@@ -63,15 +72,26 @@ async def start_session(symptom_input: SymptomInput):
         og_result = run_output_guardrails(out_state["current_question"], out_state)
         out_state["current_question"] = og_result["safe_output"]
         
+    # Check if complete
+    if out_state.get("assessment_complete") and out_state.get("mode") == "treatment" and current_user:
+        save_completed_session(db, session_id, str(current_user.id), out_state)
+        out_state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will email you the prescription once reviewed."
+        
     session_store.save_session(session_id, out_state)
     
     return agent.get_session_response(out_state)
 
 @app.post("/api/naturo/chat", response_model=AssessmentResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, req_raw: Request, db: Session = Depends(get_db)):
     state = session_store.get_session(request.session_id)
     if not state:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Enforce auth for treatment mode
+    current_user = get_optional_current_user(req_raw, db)
+    is_treatment = (request.mode == "treatment") or (state.get("mode") == "treatment")
+    if is_treatment and not current_user:
+        raise HTTPException(status_code=401, detail="User must be logged in for treatment mode")
         
     guardrail_result = run_input_guardrails(request.message)
     if not guardrail_result["safe"]:
@@ -81,19 +101,32 @@ async def chat(request: ChatRequest):
         return response
         
     out_state = await agent.process_message(request.session_id, request.message, state, mode=request.mode)
-    
+    if current_user:
+        out_state["user_id"] = str(current_user.id)
+        
     if out_state.get("current_question"):
         og_result = run_output_guardrails(out_state["current_question"], out_state)
         out_state["current_question"] = og_result["safe_output"]
+        
+    # Check if complete
+    if out_state.get("assessment_complete") and out_state.get("mode") == "treatment" and current_user:
+        save_completed_session(db, request.session_id, str(current_user.id), out_state)
+        out_state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will email you the prescription once reviewed."
         
     session_store.save_session(request.session_id, out_state)
     return agent.get_session_response(out_state)
 
 @app.post("/api/naturo/chat_stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, req_raw: Request, db: Session = Depends(get_db)):
     state = session_store.get_session(request.session_id)
     if not state:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Enforce auth for treatment mode
+    current_user = get_optional_current_user(req_raw, db)
+    is_treatment = (request.mode == "treatment") or (state.get("mode") == "treatment")
+    if is_treatment and not current_user:
+        raise HTTPException(status_code=401, detail="User must be logged in for treatment mode")
         
     guardrail_result = run_input_guardrails(request.message)
     if not guardrail_result["safe"]:
@@ -108,8 +141,16 @@ async def chat_stream(request: ChatRequest):
             
         return StreamingResponse(mock_stream(), media_type="text/event-stream")
         
+    user_id_str = str(current_user.id) if current_user else None
     return StreamingResponse(
-        agent.process_message_stream(request.session_id, request.message, state, mode=request.mode),
+        agent.process_message_stream(
+            request.session_id, 
+            request.message, 
+            state, 
+            mode=request.mode, 
+            user_id=user_id_str, 
+            db=db
+        ),
         media_type="text/event-stream"
     )
 

@@ -1,0 +1,20 @@
+flowchart LR
+    Client[Patient / Frontend] --> API[FastAPI Gateway]
+    API --> InputGuard[Input Guardrails]
+    InputGuard --> Agent[NaturopathyAgent]
+    API --> Database["Patient & Session DB<br/>(Postgres / SQLite)"]
+    Agent --> Session["Session Store<br/>(Redis / In-memory)"]
+
+    subgraph LangGraph["LangGraph Pipeline"]
+      Qdrant["Hybrid Context Retriever<br/>(Qdrant + Web Search)"] --> Intake[Intake Node]
+      Intake --> ModeCheck{Mode?}
+      ModeCheck -->|Question Mode| Response[Answer & Short Advice]
+      ModeCheck -->|Treatment Mode| RootCause[Root Cause Node]
+      RootCause --> Treatment[Treatment Design Node]
+      Treatment --> Recommendation[Recommendation Node]
+      Recommendation --> Guardrail[Output Guardrails]
+      Guardrail --> Response
+      Intake -->|Emergency / Pediatric| Guardrail
+    end
+
+    Agent --> Qdrant

@@ -7,8 +7,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import jwt
 from datetime import datetime, timedelta, timezone
+from sqlalchemy.orm import Session
 
 from config import get_settings
+from database.models import get_db, ConsultationSession, User, PatientProfile
 from rag.qdrant_store import get_document_chunk_count, delete_document_by_source, search_vector_store, get_genai_client
 from ingest_docs import yield_ingestion_progress, DOCS_DIR
 
@@ -219,3 +221,128 @@ Answer:"""
         else:
             user_msg = f"LLM error: {err_str[:200]}"
         return {"results": results, "answer": None, "llm_error": user_msg}
+
+
+class ApproveCaseRequest(BaseModel):
+    prescription_text: str
+    safety_precautions: str = ""
+    doctor_notes: str = ""
+
+
+@router.get("/pending-cases")
+def list_pending_cases(admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    sessions = db.query(ConsultationSession).filter(ConsultationSession.status == "pending_review").all()
+    cases = []
+    for s in sessions:
+        user = db.query(User).filter(User.id == s.user_id).first()
+        profile = db.query(PatientProfile).filter(PatientProfile.id == s.patient_id).first()
+        
+        # Get chief complaints or symptoms from session_data
+        symptoms = ""
+        if s.session_data:
+            # Find first user message
+            for msg in s.session_data:
+                if msg.get("role") == "user":
+                    symptoms = msg.get("content", "")
+                    break
+                    
+        cases.append({
+            "session_id": str(s.id),
+            "patient_name": user.name if user else "Unknown",
+            "patient_email": user.email if user else "",
+            "age": profile.age if profile else (user.age if user else 30),
+            "gender": profile.gender if profile else "other",
+            "region": profile.region if profile else "India",
+            "symptoms": symptoms,
+            "created_at": s.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    return {"cases": cases}
+
+
+@router.get("/cases/{session_id}")
+def get_case_details(session_id: str, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    import uuid
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session ID")
+        
+    s = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    user = db.query(User).filter(User.id == s.user_id).first()
+    profile = db.query(PatientProfile).filter(PatientProfile.id == s.patient_id).first()
+    
+    return {
+        "session_id": str(s.id),
+        "patient_name": user.name if user else "Unknown",
+        "patient_email": user.email if user else "",
+        "age": profile.age if profile else (user.age if user else 30),
+        "gender": profile.gender if profile else "other",
+        "region": profile.region if profile else "India",
+        "conversation_history": s.session_data,
+        "root_causes": s.root_causes,
+        "protocols_recommended": s.protocols_recommended,
+        "status": s.status,
+        "doctor_prescription": s.doctor_prescription,
+        "doctor_notes": s.doctor_notes
+    }
+
+
+@router.post("/cases/{session_id}/approve")
+def approve_case(session_id: str, req: ApproveCaseRequest, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    import uuid
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session ID")
+        
+    s = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    user = db.query(User).filter(User.id == s.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Update session in DB
+    s.status = "reviewed"
+    s.doctor_prescription = {
+        "prescription_text": req.prescription_text,
+        "safety_precautions": req.safety_precautions,
+        "approved_at": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    }
+    s.doctor_notes = req.doctor_notes
+    s.completed_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    
+    # Send email
+    from utils.mailer import send_prescription_email
+    send_prescription_email(
+        to_email=user.email,
+        patient_name=user.name,
+        prescription_data=s.doctor_prescription
+    )
+    
+    # Update active session in session_store (Redis/memory)
+    from memory.session_store import session_store
+    state = session_store.get_session(session_id)
+    if state:
+        state["step"] = "complete"
+        state["assessment_complete"] = True
+        state["final_report"] = {
+            "root_causes": s.root_causes,
+            "protocols": [],
+            "daily_routine": req.prescription_text,
+            "diet_guidelines": {"recommended_foods": [], "foods_to_avoid": []},
+            "red_flags": [req.safety_precautions] if req.safety_precautions else [],
+            "follow_up_timeline": "14 days",
+            "disclaimer": "Approved by Practitioner",
+            "is_reviewed": True,
+            "doctor_prescription": s.doctor_prescription
+        }
+        session_store.save_session(session_id, state)
+        
+    return {"message": "Case reviewed and prescription submitted successfully"}

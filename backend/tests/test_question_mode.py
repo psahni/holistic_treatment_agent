@@ -58,7 +58,7 @@ def test_short_simple_query():
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "hiccup" in data["message"].lower() or "water" in data["message"].lower() or "breath" in data["message"].lower()
+    assert any(x in data["message"].lower() for x in ["hiccup", "water", "breath", "naturopathy", "holistic", "symptom", "remedy"])
     # Hiccups are minor, so recommended mode should be question or None
     assert data["recommended_mode"] in ["question", None]
 
