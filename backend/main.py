@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 from config import get_settings
-from naturopathy.schemas import SymptomInput, ChatRequest, AssessmentResponse
+from naturopathy.schemas import SymptomInput, ChatRequest, AssessmentResponse, IntakeSubmitRequest
 from naturopathy.agent import NaturopathyAgent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
-from database.models import init_db, get_db, save_completed_session, ConsultationSession, PatientProfile
-from auth.utils import get_optional_current_user
+from database.models import init_db, get_db, save_completed_session, ConsultationSession, PatientProfile, User
+from auth.utils import get_optional_current_user, get_current_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -225,3 +225,50 @@ def get_patient_case_details(
         "doctor_prescription": s.doctor_prescription,
         "doctor_notes": s.doctor_notes
     }
+
+@app.post("/api/naturo/submit_intake", response_model=AssessmentResponse)
+async def submit_intake(
+    request: IntakeSubmitRequest, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    state = session_store.get_session(request.session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Populate the state with the responses collected from the form
+    from typing import Dict
+    for k, v in request.user_responses.items():
+        state["user_responses"][k] = v
+        # Also append to conversation history so it's visible in transcripts
+        label = k.replace('response_', 'Question ').capitalize()
+        state["conversation_history"].append({"role": "user", "content": f"{label}: {v}"})
+        
+    state["step"] = "root_cause"
+    state["mode"] = "treatment"
+    
+    # Run the graph to execute the analysis pipeline
+    try:
+        final_state = await agent.graph.ainvoke(state)
+        
+        # Output guardrails
+        from guardrails.output_guardrails import run_output_guardrails
+        if final_state.get("current_question"):
+            og_result = run_output_guardrails(final_state["current_question"], final_state)
+            final_state["current_question"] = og_result["safe_output"]
+            
+        final_state["user_id"] = str(current_user.id)
+        final_state["assessment_complete"] = True
+        final_state["step"] = "complete"
+        final_state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will email you the prescription once reviewed."
+        
+        # Save to database
+        from database.models import save_completed_session
+        save_completed_session(db, request.session_id, str(current_user.id), final_state)
+        
+        session_store.save_session(request.session_id, final_state)
+        return agent.get_session_response(final_state)
+        
+    except Exception as e:
+        logger.error(f"submit_intake graph error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process intake: {str(e)}")

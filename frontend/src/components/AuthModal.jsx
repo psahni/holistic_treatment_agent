@@ -42,7 +42,24 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       }
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.detail || 'Authentication failed. Please try again.');
+      let errMsg = isLogin 
+        ? 'Login failed. Please check your credentials and try again.' 
+        : 'Registration failed. Please check your details and try again.';
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (typeof data.detail === 'string') {
+          errMsg = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          errMsg = data.detail.map(d => {
+            const field = d.loc ? d.loc[d.loc.length - 1] : '';
+            const fieldName = field ? field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ') : 'Input';
+            return `${fieldName}: ${d.msg}`;
+          }).join('. ');
+        } else if (data.message) {
+          errMsg = data.message;
+        }
+      }
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

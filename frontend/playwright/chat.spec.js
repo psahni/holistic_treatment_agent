@@ -16,6 +16,11 @@ class NaturoChatPage {
 
   async startSession() {
     await this.startJourneyBtn.click();
+    await this.page.getByPlaceholder('Name').fill('Playwright Test Patient');
+    await this.page.getByPlaceholder('Age').fill('30');
+    await this.page.getByRole('combobox').selectOption('male');
+    await this.page.getByPlaceholder('Region (e.g. India)').fill('India');
+    await this.page.getByRole('button', { name: /begin your assessment/i }).click();
     await expect(this.assistantMessages.first()).toContainText('Welcome to NatureCure AI', { timeout: 15000 });
   }
 

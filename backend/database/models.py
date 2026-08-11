@@ -67,7 +67,9 @@ def create_db_engine(db_url: str):
     else:
         return create_engine(
             db_url,
-            connect_args={"connect_timeout": 15}
+            connect_args={"connect_timeout": 15},
+            pool_pre_ping=True,
+            pool_recycle=3600
         )
 
 engine = None

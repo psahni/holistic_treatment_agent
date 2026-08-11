@@ -32,6 +32,11 @@ TRUSTED_DOMAINS = load_trusted_domains()
 
 def search_authentic_web(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
     """Performs a web search using ddgs, querying AYUSH and medical references."""
+    from config import get_settings
+    if get_settings().DISABLE_WEB_SEARCH:
+        logger.info("Web search is disabled via settings.")
+        return []
+        
     try:
         from ddgs import DDGS
 
