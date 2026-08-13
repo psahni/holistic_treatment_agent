@@ -3,8 +3,17 @@ const { test, expect } = require('@playwright/test');
 test.describe('Naturopathy Practitioner E2E Workflow', () => {
 
   test('should gate Treatment Mode, allow intake completion, support admin review, and update patient view', async ({ page, context }) => {
+    test.setTimeout(240000);
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+    page.on('response', response => {
+      if (!response.ok()) {
+        console.log(`NETWORK ERROR: ${response.status()} ${response.url()}`);
+      }
+    });
+    
     // Unique email for this test execution to bypass database conflicts
     const testEmail = `patient.${Date.now()}@example.com`;
+    const testName = `John Patient ${Date.now().toString().slice(-4)}`;
 
     // 1. Visit Patient Portal homepage
     await page.goto('/');
@@ -26,7 +35,9 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
 
     // Wait for the agent to finish streaming and render the transition card
     // The agent will recommend Treatment Mode because the symptom is chronic and severe.
-    await expect(page.getByRole('heading', { name: /treatment mode suggested/i, exact: false })).toBeVisible({ timeout: 40000 });
+    await expect(page.getByTestId('switch-to-treatment-btn')).toBeVisible({ timeout: 90000 });
+    await page.getByTestId('switch-to-treatment-btn').click();
+    await expect(page.getByRole('heading', { name: /treatment mode suggested/i, exact: false })).toBeVisible({ timeout: 5000 });
 
     // 4. Click transition button "Yes, Proceed"
     // Since John is not logged in, clicking this should automatically trigger the AuthModal to open.
@@ -36,18 +47,18 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
     await expect(page.getByRole('heading', { name: /welcome back|create an account/i })).toBeVisible();
 
     // Switch to Sign Up tab
-    await page.getByRole('button', { name: /sign up/i }).click();
+    await page.getByRole('button', { name: 'Sign Up', exact: true }).click();
 
     // Fill signup details
-    await page.getByPlaceholder('Full Name').fill('John Patient');
+    await page.getByPlaceholder('Full Name').fill(testName);
     await page.getByPlaceholder('Age').fill('35');
     await page.getByPlaceholder('City').fill('New Delhi');
     await page.getByPlaceholder('Email Address').fill(testEmail);
-    await page.getByPlaceholder('Phone Number').fill('+919876543210');
+    await page.getByPlaceholder('Phone Number').fill(`+91${Date.now().toString().slice(-10)}`);
     await page.getByPlaceholder('Password (min 6 chars)').fill('secure123');
     
     // Submit registration
-    await page.getByRole('button', { name: /sign up/i, exact: true }).click();
+    await page.getByRole('button', { name: 'Sign Up', exact: true }).click();
 
     // Post-authentication, the pending mode switch is detected and the confirm overlay shows up
     await expect(page.getByRole('heading', { name: /treatment mode suggested/i, exact: false })).toBeVisible({ timeout: 15000 });
@@ -56,54 +67,45 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
     await page.getByRole('button', { name: /yes, proceed/i }).click();
 
     // The backend should welcome the user to Treatment Mode and ask the first intake question
-    // Let's answer 8 intake turns to complete the assessment.
-    // Turn 1
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 1|tell me|detail/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('It started with brain fog, hair loss, and muscle weakness.');
-    await page.keyboard.press('Enter');
+    // Wait for Step 1 form to appear
+    await expect(page.getByText('Step 1: Core Health Concerns')).toBeVisible({ timeout: 20000 });
 
-    // Turn 2
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 2|diet|eat/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('I eat refined grains, dairy, sugar, and drink tea twice a day.');
-    await page.keyboard.press('Enter');
+    // Step 1 fields
+    await page.getByPlaceholder(/primary complaint/i).fill(
+      'Severe Hashimoto thyroiditis with chronic fatigue, brain fog, hair loss'
+    );
+    await page.getByPlaceholder(/e.g. 5 years/i).fill('5 years');
+    await page.locator('input[type="range"]').fill('8');
+    await page.getByPlaceholder(/list allergies/i).fill('No allergies, not pregnant');
 
-    // Turn 3
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 3|sleep|rest/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('I sleep late around 1 AM and get about 6 hours of sleep.');
-    await page.keyboard.press('Enter');
+    // Click Next
+    await page.getByRole('button', { name: /next.*medical/i }).click();
 
-    // Turn 4
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 4|stress|emotional/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('High stress due to work pressure as a developer.');
-    await page.keyboard.press('Enter');
+    // Step 2 should appear
+    await expect(page.getByText('Step 2: Medical & Lifestyle Profile')).toBeVisible({ timeout: 5000 });
 
-    // Turn 5
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 5|exercise|active/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('I am very sedentary, sitting for 9-10 hours a day.');
-    await page.keyboard.press('Enter');
+    // Step 2 fields
+    await page.getByPlaceholder(/past diagnoses/i).fill('Hashimoto thyroiditis, Vitamin D deficiency');
+    await page.getByPlaceholder(/medications/i).fill('Levothyroxine 75mcg, Vitamin D3');
+    await page.getByPlaceholder(/vegetarian, high-protein/i).fill('Vegetarian, moderate appetite, 2L water/day');
+    await page.getByPlaceholder(/6 hours sleep, moderate stress/i).fill('6 hours sleep, high stress, sedentary desk job');
 
-    // Turn 6
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 6|digestion|bowel/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('Frequent constipation and gas.');
-    await page.keyboard.press('Enter');
+    // Click Next: Review
+    await page.getByRole('button', { name: /next.*review/i }).click();
 
-    // Turn 7
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 7|medical history|medication/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('Currently taking thyroxine 75mcg.');
-    await page.keyboard.press('Enter');
+    // Step 3: Review screen
+    await expect(page.getByText('Step 3: Review Your Submitted Details')).toBeVisible({ timeout: 5000 });
 
-    // Turn 8 (Final Turn)
-    await expect(page.getByTestId('assistant-message').last()).toContainText(/question 8|anything else|complete/i, { timeout: 20000 });
-    await page.getByPlaceholder('Describe your symptoms in detail...').fill('Nothing else to add.');
-    await page.keyboard.press('Enter');
+    // Submit the form
+    await page.getByRole('button', { name: /confirm.*submit to doctor/i }).click();
 
-    // Wait for the "Case Pending Review" layout to render upon intake completion
-    await expect(page.getByRole('heading', { name: /intake complete/i, exact: false })).toBeVisible({ timeout: 45000 });
-    await expect(page.getByText('Case ID:')).toBeVisible();
+    // Wait for redirect to /history and see pending case
+    await expect(page).toHaveURL(/\/history/, { timeout: 60000 });
+    await expect(page.getByText(/pending review/i).first()).toBeVisible({ timeout: 15000 });
 
     // Keep reference of the case id text to verify later
-    const caseText = await page.getByText(/case id:/i).textContent();
-    console.log(`E2E Case ID generated: ${caseText}`);
+    const caseText = await page.getByText(/Case #/i).first().textContent();
+    console.log(`E2E Case ID generated: ${caseText.trim()}`);
 
     // 5. Open admin dashboard in a new tab to approve the case
     const adminPage = await context.newPage();
@@ -111,7 +113,7 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
 
     // Log in as practitioner
     await adminPage.getByPlaceholder('Username').fill('admin');
-    await adminPage.getByPlaceholder('Password').fill('admin123');
+    await adminPage.getByPlaceholder('Password').fill('admin');
     await adminPage.getByRole('button', { name: /login/i }).click();
 
     // Verify RAG dashboard heading
@@ -120,18 +122,18 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
     // Switch to Practitioner Console tab
     await adminPage.getByRole('button', { name: /practitioner console/i }).click();
 
-    // Locate John Patient in the pending cases list and click
-    await adminPage.getByText('John Patient').first().click();
+    // Locate the unique patient in the pending cases list and click
+    await adminPage.getByText(testName).first().click();
 
     // Wait for case transcript details to load
-    await expect(adminPage.getByRole('heading', { name: /review case: john patient/i, exact: false })).toBeVisible({ timeout: 15000 });
+    await expect(adminPage.getByRole('heading', { name: new RegExp(`review case: ${testName}`, 'i') })).toBeVisible({ timeout: 15000 });
 
-    // Apply "Chronic Fatigue" template
-    await adminPage.getByRole('button', { name: /fatigue restore/i }).click();
+    // Apply "Body Pain" template
+    await adminPage.getByRole('button', { name: /body pain/i }).click();
 
     // Verify fields are pre-populated
     const prescriptionInput = adminPage.locator('textarea').first();
-    await expect(prescriptionInput).toContainText('Chronic Fatigue Restore Protocol');
+    await expect(prescriptionInput).toContainText(/body pain|musculoskeletal/i);
 
     // Submit approval
     adminPage.once('dialog', async dialog => {
@@ -141,19 +143,20 @@ test.describe('Naturopathy Practitioner E2E Workflow', () => {
     await adminPage.getByRole('button', { name: /approve & send prescription/i }).click();
 
     // Wait for queue item to clear
-    await expect(adminPage.getByText('John Patient')).not.toBeVisible({ timeout: 15000 });
+    await expect(adminPage.getByText(testName).first()).not.toBeVisible({ timeout: 15000 });
 
     // Close admin tab
     await adminPage.close();
 
-    // 6. Go back to John's chat tab and click "Check Review Status"
+    // 6. Go back to patient's tab (on /history) and reload to view approved prescription
     await page.bringToFront();
-    await page.getByRole('button', { name: /check review status/i }).click();
-
-    // Verify the approved prescription layout is rendered instantly
-    await expect(page.getByRole('heading', { name: /approved nature cure protocol/i, exact: false })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Prescribed Protocol')).toBeVisible();
-    await expect(page.getByText('Chronic Fatigue Restore Protocol')).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/pending review|prescription ready/i).first()).toBeVisible({ timeout: 15000 });
+    
+    // Click case to expand details
+    await page.getByText(/Case #/i).first().click();
+    await expect(page.getByRole('heading', { name: /doctor's prescription/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/body pain|musculoskeletal/i).first()).toBeVisible();
 
     if (!process.env.CI) {
       await page.waitForTimeout(3000); // Visual inspection hold

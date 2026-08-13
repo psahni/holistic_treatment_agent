@@ -115,6 +115,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             messages.append(HumanMessage(content=intro))
             
         response = llm.invoke(messages)
+        logger.info(f"DEBUG LLM OUTPUT (Question Mode): {response.content}")
         
         if response and response.content:
             content = response.content
@@ -152,6 +153,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             messages.append(HumanMessage(content=intro))
             
         response = llm.invoke(messages)
+        logger.info(f"DEBUG LLM OUTPUT (Treatment Mode): {response.content}")
         
         if len(responses) >= 8:
             state["step"] = "root_cause"

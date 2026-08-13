@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Send, Leaf, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useRouter } from 'next/navigation';
 import { naturopathyAPI } from '../services/api';
 import AssessmentProgress from './AssessmentProgress';
 import RecommendationCard from './RecommendationCard';
@@ -11,6 +12,7 @@ import Loader from './Loader';
 import AuthModal from './AuthModal';
 
 export default function ChatInterface({ sessionId, user }) {
+  const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(sessionId !== 'new' ? sessionId : null);
   const [input, setInput] = useState('');
@@ -186,8 +188,8 @@ export default function ChatInterface({ sessionId, user }) {
       if (reply.is_complete || reply.assessment_complete) {
         setIsComplete(true);
         if (reply.report) setReport(reply.report);
-        // Automatically start checking for review status
-        setTimeout(checkCaseReviewStatus, 1500);
+        // Redirect the user to the history page where they can see the pending case
+        router.push('/history');
       }
     } catch (err) {
       console.error("Failed to submit intake form:", err);
@@ -262,8 +264,10 @@ export default function ChatInterface({ sessionId, user }) {
           if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
           if (response.need_practitioner) setNeedsPractitioner(true);
           
+          console.log("RECOMMENDED MODE:", response.recommended_mode);
           if (response.recommended_mode === "treatment") {
             setSuggestedModeSwitch(true);
+            sessionStorage.setItem("pending_mode_switch", "treatment");
           }
           
           if (response.is_complete || response.assessment_complete) {
@@ -639,6 +643,7 @@ export default function ChatInterface({ sessionId, user }) {
                         To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
                       </p>
                       <button 
+                        data-testid="switch-to-treatment-btn"
                         onClick={() => setShowTransitionPrompt(true)}
                         className="btn btn-primary"
                         style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -776,31 +781,71 @@ export default function ChatInterface({ sessionId, user }) {
 
         {/* Input Area */}
         {!(mode === 'treatment' && !isComplete) && (
-          <div style={{ padding: '2rem', borderTop: '1px solid var(--cream-dark)', background: 'var(--cream)' }}>
-            <div style={{ display: 'flex', gap: '1rem', maxWidth: '800px', margin: '0 auto' }}>
-              <input 
-                type="text" 
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSend()}
-                placeholder="Describe your symptoms in detail..."
-                style={{
-                  flex: 1,
-                  padding: '1rem 1.5rem',
-                  borderRadius: '2rem',
-                  border: '1px solid var(--sage)',
-                  outline: 'none',
-                  fontSize: '1rem',
-                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+          <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: 'var(--white)',
+                borderRadius: '2rem',
+                border: '1.5px solid var(--card-border)',
+                padding: '0.5rem 0.5rem 0.5rem 1.5rem',
+                boxShadow: '0 2px 12px rgba(72, 99, 59, 0.07)',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+              }}
+                onFocusCapture={e => {
+                  e.currentTarget.style.borderColor = 'var(--primary-green)';
+                  e.currentTarget.style.boxShadow = '0 2px 16px rgba(72, 99, 59, 0.15)';
                 }}
-              />
-              <button 
-                onClick={handleSend}
-                className="btn-primary"
-                style={{ width: '3.5rem', height: '3.5rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}
+                onBlurCapture={e => {
+                  e.currentTarget.style.borderColor = 'var(--card-border)';
+                  e.currentTarget.style.boxShadow = '0 2px 12px rgba(72, 99, 59, 0.07)';
+                }}
               >
-                <Send size={20} />
-              </button>
+                <input 
+                  type="text" 
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Describe your symptoms in detail…"
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: '0.95rem',
+                    color: 'var(--text-main)',
+                    fontFamily: 'Inter, sans-serif',
+                    lineHeight: 1.5,
+                    padding: '0.5rem 0',
+                  }}
+                />
+                <button 
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  style={{
+                    flexShrink: 0,
+                    width: '2.75rem',
+                    height: '2.75rem',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    border: 'none',
+                    cursor: input.trim() ? 'pointer' : 'not-allowed',
+                    background: input.trim() ? 'var(--primary-green)' : 'var(--card-border)',
+                    color: 'var(--white)',
+                    transition: 'background 0.2s ease, transform 0.15s ease',
+                    boxShadow: input.trim() ? '0 2px 8px rgba(72, 99, 59, 0.25)' : 'none',
+                  }}
+                  onMouseEnter={e => { if (input.trim()) e.currentTarget.style.transform = 'scale(1.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
           </div>
         )}

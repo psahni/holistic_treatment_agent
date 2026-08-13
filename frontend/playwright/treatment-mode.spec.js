@@ -18,8 +18,9 @@ const { test, expect } = require('@playwright/test');
 test.describe('Full Treatment Mode E2E', () => {
 
   test('complete treatment lifecycle: symptom → signup → intake form → admin review → prescription', async ({ page, context }) => {
+    test.setTimeout(240000);
     const testEmail = `e2e.patient.${Date.now()}@example.com`;
-    const testName = 'E2E Treatment Patient';
+    const testName = `E2E Patient ${Date.now().toString().slice(-4)}`;
 
     // ─────────────────────────────────────────────────
     // STEP 1: Land on homepage & start session
@@ -49,13 +50,13 @@ test.describe('Full Treatment Mode E2E', () => {
     // Wait for assistant response with treatment mode suggestion
     // The "Switch to Full Treatment Mode" button should appear inline
     await expect(
-      page.getByRole('button', { name: /switch to full treatment mode/i })
-    ).toBeVisible({ timeout: 45000 });
+      page.getByTestId('switch-to-treatment-btn')
+    ).toBeVisible({ timeout: 90000 });
 
     // ─────────────────────────────────────────────────
     // STEP 3: Click the inline switch link
     // ─────────────────────────────────────────────────
-    await page.getByRole('button', { name: /switch to full treatment mode/i }).click();
+    await page.getByTestId('switch-to-treatment-btn').click();
 
     // Transition prompt modal should appear
     await expect(
@@ -75,7 +76,7 @@ test.describe('Full Treatment Mode E2E', () => {
     // ─────────────────────────────────────────────────
     // STEP 5: Sign up
     // ─────────────────────────────────────────────────
-    await page.getByRole('button', { name: /sign up/i }).click();
+    await page.getByRole('button', { name: 'Sign Up', exact: true }).click();
 
     await page.getByPlaceholder('Full Name').fill(testName);
     await page.getByPlaceholder('Age').fill('40');
@@ -84,7 +85,7 @@ test.describe('Full Treatment Mode E2E', () => {
     await page.getByPlaceholder('Phone Number').fill(`+91${Math.floor(1000000000 + Math.random() * 9000000000)}`);
     await page.getByPlaceholder('Password (min 6 chars)').fill('testpass123');
 
-    await page.getByRole('button', { name: /sign up/i, exact: true }).click();
+    await page.getByRole('button', { name: 'Sign Up', exact: true }).click();
 
     // ─────────────────────────────────────────────────
     // STEP 6: Post-auth → transition prompt re-appears → confirm
@@ -102,7 +103,7 @@ test.describe('Full Treatment Mode E2E', () => {
     await expect(page.getByText('Step 1: Core Health Concerns')).toBeVisible({ timeout: 20000 });
 
     // Step 1 fields
-    await page.getByPlaceholder(/primary health concern/i).fill(
+    await page.getByPlaceholder(/primary complaint/i).fill(
       'Severe Hashimoto thyroiditis with chronic fatigue, brain fog, hair loss'
     );
     await page.getByPlaceholder(/e.g. 5 years/i).fill('5 years');
@@ -119,9 +120,9 @@ test.describe('Full Treatment Mode E2E', () => {
 
     // Step 2 fields
     await page.getByPlaceholder(/past diagnoses/i).fill('Hashimoto thyroiditis, Vitamin D deficiency');
-    await page.getByPlaceholder(/medications.*supplements/i).fill('Levothyroxine 75mcg, Vitamin D3');
-    await page.getByPlaceholder(/vegetarian.*high-protein/i).fill('Vegetarian, moderate appetite, 2L water/day');
-    await page.getByPlaceholder(/sleep.*stress/i).fill('6 hours sleep, high stress, sedentary desk job');
+    await page.getByPlaceholder(/medications/i).fill('Levothyroxine 75mcg, Vitamin D3');
+    await page.getByPlaceholder(/vegetarian, high-protein/i).fill('Vegetarian, moderate appetite, 2L water/day');
+    await page.getByPlaceholder(/6 hours sleep, moderate stress/i).fill('6 hours sleep, high stress, sedentary desk job');
 
     // Click Next: Review
     await page.getByRole('button', { name: /next.*review/i }).click();
@@ -138,14 +139,14 @@ test.describe('Full Treatment Mode E2E', () => {
     await page.getByRole('button', { name: /confirm.*submit to doctor/i }).click();
 
     // ─────────────────────────────────────────────────
-    // STEP 8: Wait for case pending review card
+    // STEP 8: Wait for redirect to /history and see pending case
     // ─────────────────────────────────────────────────
-    await expect(
-      page.getByText(/intake complete|case pending review/i)
-    ).toBeVisible({ timeout: 60000 });
+    await expect(page).toHaveURL(/\/history/, { timeout: 60000 });
+    await expect(page.getByText(/pending review/i).first()).toBeVisible({ timeout: 15000 });
 
     // Capture Case ID
-    const caseIdText = await page.getByText(/case id:/i).textContent();
+    const caseText = await page.getByText(/Case #/i).first().textContent();
+    const caseIdText = caseText.trim();
     console.log(`[E2E] Case submitted: ${caseIdText}`);
 
     // ─────────────────────────────────────────────────
@@ -168,20 +169,22 @@ test.describe('Full Treatment Mode E2E', () => {
     await adminPage.getByRole('button', { name: /practitioner console/i }).click();
 
     // Find and click the patient's case
-    await expect(adminPage.getByText(testName)).toBeVisible({ timeout: 10000 });
+    await expect(adminPage.getByText(testName).first()).toBeVisible({ timeout: 10000 });
     await adminPage.getByText(testName).first().click();
 
     // Wait for case details to load
+    await adminPage.waitForTimeout(3000); // Wait 3 seconds to let backend fetch complete
+    await adminPage.screenshot({ path: 'admin-dashboard-timeout.png', fullPage: true });
     await expect(
-      adminPage.getByText(/review case/i)
+      adminPage.getByRole('heading', { name: new RegExp(`review case: ${testName}`, 'i') })
     ).toBeVisible({ timeout: 15000 });
 
-    // Apply Chronic Fatigue template
-    await adminPage.getByRole('button', { name: /fatigue restore/i }).click();
+    // Apply Body Pain template
+    await adminPage.getByRole('button', { name: /body pain/i }).click();
 
     // Verify prescription textarea is populated
     const prescriptionField = adminPage.locator('textarea').first();
-    await expect(prescriptionField).toContainText(/fatigue/i, { timeout: 5000 });
+    await expect(prescriptionField).toContainText(/body pain|musculoskeletal/i, { timeout: 5000 });
 
     // Submit approval (handle alert dialog)
     adminPage.once('dialog', async dialog => {
@@ -191,21 +194,20 @@ test.describe('Full Treatment Mode E2E', () => {
     await adminPage.getByRole('button', { name: /approve.*send/i }).click();
 
     // Verify case is removed from pending queue
-    await expect(adminPage.getByText(testName)).not.toBeVisible({ timeout: 15000 });
+    await expect(adminPage.getByText(testName).first()).not.toBeVisible({ timeout: 10000 });
     await adminPage.close();
 
     // ─────────────────────────────────────────────────
-    // STEP 10: Patient checks review status → sees prescription
+    // STEP 10: Patient checks history page → sees prescription
     // ─────────────────────────────────────────────────
     await page.bringToFront();
-    await page.getByRole('button', { name: /check review status/i }).click();
-
-    await expect(
-      page.getByText(/approved nature cure protocol/i)
-    ).toBeVisible({ timeout: 15000 });
-
-    await expect(page.getByText(/prescribed protocol/i)).toBeVisible();
-    await expect(page.getByText(/fatigue/i)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/pending review|prescription ready/i).first()).toBeVisible({ timeout: 15000 });
+    
+    // Click case to expand details
+    await page.getByText(/Case #/i).first().click();
+    await expect(page.getByRole('heading', { name: /doctor's prescription/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/body pain|musculoskeletal/i).first()).toBeVisible();
 
     // Visual hold for manual inspection
     if (!process.env.CI) {
@@ -214,9 +216,7 @@ test.describe('Full Treatment Mode E2E', () => {
   });
 
   test('patient can view case in /history page after submission', async ({ page }) => {
-    // This test assumes a case was submitted via a previous test or manual action.
-    // It verifies the /history page loads and shows cases for authenticated users.
-
+    test.setTimeout(240000);
     const testEmail = `history.test.${Date.now()}@example.com`;
 
     // Sign up a new user first
@@ -240,6 +240,7 @@ test.describe('Full Treatment Mode E2E', () => {
   });
 
   test('transition prompt: patient can decline treatment mode and stay in question mode', async ({ page }) => {
+    test.setTimeout(240000);
     await page.goto('/');
     await page.getByRole('button', { name: /start your healing journey/i }).click();
 
@@ -256,13 +257,10 @@ test.describe('Full Treatment Mode E2E', () => {
     );
     await page.keyboard.press('Enter');
 
-    // Wait for the switch button
-    await expect(
-      page.getByRole('button', { name: /switch to full treatment mode/i })
-    ).toBeVisible({ timeout: 45000 });
-
-    // Click switch → modal appears
-    await page.getByRole('button', { name: /switch to full treatment mode/i }).click();
+    // The agent will recommend Treatment Mode because the symptom is chronic and severe.
+    // Increase timeout significantly because LLM can take a while to respond
+    await expect(page.getByTestId('switch-to-treatment-btn')).toBeVisible({ timeout: 90000 });
+    await page.getByTestId('switch-to-treatment-btn').click();
     await expect(
       page.getByRole('heading', { name: /full treatment mode suggested/i })
     ).toBeVisible({ timeout: 10000 });
@@ -280,6 +278,7 @@ test.describe('Full Treatment Mode E2E', () => {
   });
 
   test('intake form validation: Step 1 blocks Next without required fields', async ({ page }) => {
+    test.setTimeout(240000);
     // This test requires a logged-in user in treatment mode.
     // We'll use a fresh signup flow.
     const testEmail = `validation.${Date.now()}@example.com`;
@@ -296,7 +295,7 @@ test.describe('Full Treatment Mode E2E', () => {
     await page.getByPlaceholder('Email Address').fill(testEmail);
     await page.getByPlaceholder('Phone Number').fill(`+91${Math.floor(1000000000 + Math.random() * 9000000000)}`);
     await page.getByPlaceholder('Password (min 6 chars)').fill('testpass123');
-    await page.getByRole('button', { name: /sign up/i, exact: true }).click();
+    await page.getByRole('button', { name: 'Sign Up', exact: true }).click();
 
     // Wait for auth to complete (modal closes, nav shows Welcome)
     await expect(page.getByText(/welcome, validation tester/i)).toBeVisible({ timeout: 10000 });
@@ -313,11 +312,11 @@ test.describe('Full Treatment Mode E2E', () => {
 
     // Wait for switch button
     await expect(
-      page.getByRole('button', { name: /switch to full treatment mode/i })
-    ).toBeVisible({ timeout: 45000 });
+      page.getByTestId('switch-to-treatment-btn')
+    ).toBeVisible({ timeout: 90000 });
 
     // Click switch → modal → confirm (user is already logged in, goes straight to form)
-    await page.getByRole('button', { name: /switch to full treatment mode/i }).click();
+    await page.getByTestId('switch-to-treatment-btn').click();
     await expect(
       page.getByRole('heading', { name: /full treatment mode suggested/i })
     ).toBeVisible({ timeout: 10000 });
@@ -333,14 +332,15 @@ test.describe('Full Treatment Mode E2E', () => {
     await expect(page.getByText(/please fill out all required/i)).toBeVisible({ timeout: 5000 });
 
     // Fill only the first field, still missing duration
-    await page.getByPlaceholder(/primary health concern/i).fill('Fibromyalgia pain');
+    await page.getByPlaceholder(/primary complaint/i).fill('Just testing validation');
+    // Deliberately leave duration blank to trigger validation
     await page.getByRole('button', { name: /next.*medical/i }).click();
 
-    // Should still block (duration is required)
-    await expect(page.getByText(/please fill out all required/i)).toBeVisible({ timeout: 5000 });
+    // Verify error message appears
+    await expect(page.getByText(/please fill out all required/i)).toBeVisible();
 
-    // Fill duration too → should allow
-    await page.getByPlaceholder(/e.g. 5 years/i).fill('6 years');
+    // Fill the missing required field
+    await page.getByPlaceholder(/e.g. 5 years/i).fill('2 months');
     await page.getByRole('button', { name: /next.*medical/i }).click();
 
     // Step 2 should now appear

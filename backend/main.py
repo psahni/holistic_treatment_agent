@@ -33,7 +33,11 @@ app.include_router(admin_router, prefix="/api/admin")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -247,28 +251,18 @@ async def submit_intake(
     state["step"] = "root_cause"
     state["mode"] = "treatment"
     
-    # Run the graph to execute the analysis pipeline
+    # Save directly without AI processing
+    state["assessment_complete"] = True
+    state["step"] = "complete"
+    state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will notify you once your case is reviewed."
+    state["user_id"] = str(current_user.id)
+    
+    # Save to database
+    from database.models import save_completed_session
     try:
-        final_state = await agent.graph.ainvoke(state)
-        
-        # Output guardrails
-        from guardrails.output_guardrails import run_output_guardrails
-        if final_state.get("current_question"):
-            og_result = run_output_guardrails(final_state["current_question"], final_state)
-            final_state["current_question"] = og_result["safe_output"]
-            
-        final_state["user_id"] = str(current_user.id)
-        final_state["assessment_complete"] = True
-        final_state["step"] = "complete"
-        final_state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will email you the prescription once reviewed."
-        
-        # Save to database
-        from database.models import save_completed_session
-        save_completed_session(db, request.session_id, str(current_user.id), final_state)
-        
-        session_store.save_session(request.session_id, final_state)
-        return agent.get_session_response(final_state)
-        
+        save_completed_session(db, request.session_id, str(current_user.id), state)
+        session_store.save_session(request.session_id, state)
+        return agent.get_session_response(state)
     except Exception as e:
-        logger.error(f"submit_intake graph error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process intake: {str(e)}")
+        logger.error(f"Database error saving intake: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database error saving intake: {str(e)}")

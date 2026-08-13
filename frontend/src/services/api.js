@@ -174,5 +174,38 @@ export const naturopathyAPI = {
     return fetchWithCredentials(`${API_BASE}/api/naturo/cases/${caseId}`, {
       method: 'GET'
     });
+  },
+
+  // Prescription Template Endpoints
+  getTemplates: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
+      method: 'GET'
+    });
+  },
+
+  createTemplate: async (templateData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
+      method: 'POST',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  updateTemplate: async (templateId, templateData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates/${templateId}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  deleteTemplate: async (templateId) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates/${templateId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  generateAIPrescription: async (sessionId) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}/generate-ai-prescription`, {
+      method: 'POST'
+    });
   }
 };

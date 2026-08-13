@@ -1,7 +1,8 @@
 import os
 import asyncio
 from pathlib import Path
-from typing import List
+import uuid
+from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Response, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from config import get_settings
-from database.models import get_db, ConsultationSession, User, PatientProfile
+from database.models import get_db, ConsultationSession, User, PatientProfile, PrescriptionTemplate
 from rag.qdrant_store import get_document_chunk_count, delete_document_by_source, search_vector_store, get_genai_client
 from ingest_docs import yield_ingestion_progress, DOCS_DIR
 
@@ -348,3 +349,123 @@ def approve_case(session_id: str, req: ApproveCaseRequest, admin: str = Depends(
         session_store.save_session(session_id, state)
         
     return {"message": "Case reviewed and prescription submitted successfully"}
+
+
+# Pydantic models
+class TemplateCreateRequest(BaseModel):
+    name: str
+    category: str
+    prescription_text: str
+    safety_precautions: str = ''
+
+class TemplateUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    prescription_text: Optional[str] = None
+    safety_precautions: Optional[str] = None
+
+# GET /api/admin/templates
+@router.get('/templates')
+def get_templates(admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    templates = db.query(PrescriptionTemplate).order_by(PrescriptionTemplate.category).all()
+    return [{"id": t.id, "name": t.name, "category": t.category, 
+             "prescription_text": t.prescription_text, "safety_precautions": t.safety_precautions,
+             "created_at": t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else None,
+             "updated_at": t.updated_at.strftime('%Y-%m-%d %H:%M') if t.updated_at else None} 
+            for t in templates]
+
+# POST /api/admin/templates  
+@router.post('/templates')
+def create_template(req: TemplateCreateRequest, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    template = PrescriptionTemplate(name=req.name, category=req.category, 
+                                     prescription_text=req.prescription_text,
+                                     safety_precautions=req.safety_precautions)
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    return {"id": template.id, "message": "Template created successfully"}
+
+# PUT /api/admin/templates/{id}
+@router.put('/templates/{template_id}')
+def update_template(template_id: int, req: TemplateUpdateRequest, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    template = db.query(PrescriptionTemplate).filter(PrescriptionTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if req.name is not None: template.name = req.name
+    if req.category is not None: template.category = req.category
+    if req.prescription_text is not None: template.prescription_text = req.prescription_text
+    if req.safety_precautions is not None: template.safety_precautions = req.safety_precautions
+    db.commit()
+    return {"message": "Template updated"}
+
+# DELETE /api/admin/templates/{id}
+@router.delete('/templates/{template_id}')
+def delete_template(template_id: int, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    template = db.query(PrescriptionTemplate).filter(PrescriptionTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    db.delete(template)
+    db.commit()
+    return {"message": "Template deleted"}
+
+# POST /api/admin/cases/{session_id}/generate-ai-prescription
+@router.post('/cases/{session_id}/generate-ai-prescription')
+async def generate_ai_prescription(session_id: str, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """On-demand AI prescription generation — doctor clicks a button to invoke this."""
+    from naturopathy.agent import agent
+    from memory.session_store import session_store
+    import uuid
+    
+    state = session_store.get_session(session_id)
+    if not state:
+        # Try loading from DB
+        session_uuid = uuid.UUID(session_id)
+        session = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        # Reconstruct minimal state from DB
+        state = {
+            "conversation_history": session.session_data or [],
+            "user_responses": {},
+            "patient_info": {},
+            "step": "root_cause",
+            "mode": "treatment"
+        }
+    else:
+        state["step"] = "root_cause"
+        state["mode"] = "treatment"
+    
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        final_state = await agent.graph.ainvoke(state)
+        
+        # Extract the generated prescription
+        daily_routine = final_state.get("final_report", {}).get("daily_routine", "")
+        root_causes = final_state.get("root_causes", [])
+        diet = final_state.get("final_report", {}).get("diet_guidelines", {})
+        red_flags = final_state.get("final_report", {}).get("red_flags", [])
+        
+        # Format into a readable prescription text
+        prescription_parts = []
+        if daily_routine:
+            prescription_parts.append(f"DAILY ROUTINE:\n{daily_routine}")
+        if diet:
+            recommended = diet.get("recommended_foods", [])
+            avoid = diet.get("foods_to_avoid", [])
+            if recommended:
+                prescription_parts.append(f"RECOMMENDED FOODS:\n" + "\n".join(f"- {f}" for f in recommended))
+            if avoid:
+                prescription_parts.append(f"FOODS TO AVOID:\n" + "\n".join(f"- {f}" for f in avoid))
+        
+        return {
+            "prescription_text": "\n\n".join(prescription_parts) if prescription_parts else "AI was unable to generate a detailed prescription. Please write manually.",
+            "safety_precautions": ", ".join(red_flags) if red_flags else "",
+            "root_causes": root_causes
+        }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"AI prescription generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+

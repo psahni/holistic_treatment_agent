@@ -48,3 +48,5 @@ frontend/test-results/
 
 scratch_*.py
 test-results/
+
+**/*/coverage_be.json
