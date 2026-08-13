@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AuthModal from './AuthModal';
+import PatientFormModal from './PatientFormModal';
 import { naturopathyAPI } from '../services/api';
 
 export default function HeroSection({ onStart }) {
@@ -31,7 +32,17 @@ export default function HeroSection({ onStart }) {
   };
 
   const handleStartJourney = () => {
-    onStart('new', user);
+    if (user) {
+      onStart('new', {
+        name: user.name,
+        age: user.age,
+        region: user.city || 'India',
+        gender: 'other',
+        loggedInUser: user
+      });
+    } else {
+      setIsPatientModalOpen(true);
+    }
   };
 
   return (
@@ -51,6 +62,7 @@ export default function HeroSection({ onStart }) {
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           {user ? (
             <>
+              <a href="/history" style={{ color: 'var(--primary-green)', textDecoration: 'none', fontWeight: 500, fontSize: '0.95rem' }}>📋 My Cases</a>
               <span style={{ fontWeight: 500, color: 'var(--text-light)' }}>Welcome, {user.name}</span>
               <button className="btn-secondary" onClick={handleLogout} style={{ border: 'none' }}>Logout</button>
             </>
@@ -222,6 +234,15 @@ export default function HeroSection({ onStart }) {
         onAuthSuccess={() => {
           setIsAuthModalOpen(false);
           checkAuth();
+        }}
+      />
+
+      <PatientFormModal
+        isOpen={isPatientModalOpen}
+        onClose={() => setIsPatientModalOpen(false)}
+        onStart={(id, formData) => {
+          setIsPatientModalOpen(false);
+          onStart(id, { ...formData, loggedInUser: user });
         }}
       />
     </div>

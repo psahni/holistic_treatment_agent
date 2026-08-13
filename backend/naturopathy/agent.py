@@ -22,7 +22,7 @@ class NaturopathyAgent:
             "Could you please tell me about the main health concern you're experiencing today?"
         )
         state['conversation_history'].append({
-            "role": "agent", 
+            "role": "assistant", 
             "content": state['current_question']
         })
         return state

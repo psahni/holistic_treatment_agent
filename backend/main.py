@@ -4,19 +4,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uuid
 import logging
+import sys
 import traceback
 from sqlalchemy.orm import Session
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 logger = logging.getLogger(__name__)
 
 from config import get_settings
-from naturopathy.schemas import SymptomInput, ChatRequest, AssessmentResponse
+from naturopathy.schemas import SymptomInput, ChatRequest, AssessmentResponse, IntakeSubmitRequest
 from naturopathy.agent import NaturopathyAgent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
-from database.models import init_db, get_db, save_completed_session, ConsultationSession, PatientProfile
-from auth.utils import get_optional_current_user
+from database.models import init_db, get_db, save_completed_session, ConsultationSession, PatientProfile, User
+from auth.utils import get_optional_current_user, get_current_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,7 +40,11 @@ app.include_router(admin_router, prefix="/api/admin")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,3 +236,94 @@ def get_patient_case_details(
         "doctor_prescription": s.doctor_prescription,
         "doctor_notes": s.doctor_notes
     }
+
+@app.delete("/api/naturo/cases/{case_id}")
+def delete_patient_case(
+    case_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    try:
+        print(f"=== DELETE CASE {case_id} REQUEST RECEIVED ===")
+        sys.stdout.flush()
+        
+        current_user = get_optional_current_user(request, db)
+        if not current_user:
+            print("ERROR: Authentication failed during case deletion (current_user is None).")
+            sys.stdout.flush()
+            raise HTTPException(status_code=401, detail="Authentication required")
+            
+        print(f"User authenticated: {current_user.id}")
+        sys.stdout.flush()
+        
+        s = db.query(ConsultationSession).filter(
+            ConsultationSession.case_id == case_id,
+            ConsultationSession.user_id == current_user.id
+        ).first()
+        
+        if not s:
+            print(f"ERROR: Case {case_id} not found for user {current_user.id} in DB.")
+            sys.stdout.flush()
+            raise HTTPException(status_code=404, detail="Case not found")
+            
+        print(f"Case found in DB. Current status: '{s.status}'")
+        sys.stdout.flush()
+            
+        if s.status != 'pending_review':
+            print(f"ERROR: Case {case_id} status is '{s.status}', deletion forbidden. Must be 'pending_review'.")
+            sys.stdout.flush()
+            raise HTTPException(status_code=403, detail="Cannot delete a case that is already reviewed or in progress.")
+            
+        db.delete(s)
+        db.commit()
+        print(f"=== SUCCESSFULLY DELETED CASE {case_id} ===")
+        sys.stdout.flush()
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"=== UNEXPECTED ERROR DELETING CASE {case_id} ===")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+
+@app.post("/api/naturo/submit_intake", response_model=AssessmentResponse)
+async def submit_intake(
+    request: IntakeSubmitRequest, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    state = session_store.get_session(request.session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    # Populate the state with the responses collected from the form
+    from typing import Dict
+    for k, v in request.user_responses.items():
+        state["user_responses"][k] = v
+        # Also append to conversation history so it's visible in transcripts
+        label = k.replace('response_', 'Question ').capitalize()
+        state["conversation_history"].append({"role": "user", "content": f"{label}: {v}"})
+        
+    state["step"] = "root_cause"
+    state["mode"] = "treatment"
+    
+    # Save directly without AI processing
+    state["assessment_complete"] = True
+    state["step"] = "complete"
+    state["current_question"] = "Thank you! Your health intake is complete. Your details have been sent to our Naturopathy practitioner for review. We will notify you once your case is reviewed."
+    state["user_id"] = str(current_user.id)
+    
+    # Save to database
+    from database.models import save_completed_session
+    try:
+        save_completed_session(db, request.session_id, str(current_user.id), state)
+        session_store.save_session(request.session_id, state)
+        return agent.get_session_response(state)
+    except Exception as e:
+        logger.error(f"Database error saving intake: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database error saving intake: {str(e)}")

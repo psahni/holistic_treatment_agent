@@ -13,6 +13,10 @@ class SymptomInput(BaseModel):
     patient_info: Optional[PatientInfo] = None
     mode: str = "question"
 
+class IntakeSubmitRequest(BaseModel):
+    session_id: str
+    user_responses: Dict[str, str]
+
 class ChatRequest(BaseModel):
     session_id: str
     message: str

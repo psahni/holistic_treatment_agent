@@ -12,7 +12,7 @@ export default function AdminPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/admin/check-auth', {
+        const response = await fetch('http://localhost:8080/api/admin/check-auth', {
           credentials: 'include'
         });
         if (response.ok) {

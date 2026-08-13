@@ -65,3 +65,15 @@ make stop
 
 - **Backend API**: `http://localhost:8000` (Swagger Docs: `http://localhost:8000/docs`)
 - **Frontend UI**: `http://localhost:3000`
+
+
+## Run Playwright tests
+
+# 1. First, navigate into the frontend folder
+cd frontend
+
+# 2. Then run the tests (Headless mode)
+npx playwright test playwright/treatment-mode.spec.js
+
+# OR run with a visible browser so you can watch it (Interactive mode)
+npx playwright test playwright/treatment-mode.spec.js --headed

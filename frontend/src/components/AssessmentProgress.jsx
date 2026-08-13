@@ -4,12 +4,16 @@ import { motion } from 'framer-motion';
 const steps = [
   { id: 'intake', label: 'Health Intake', icon: '📋', description: 'Tell us about your symptoms' },
   { id: 'root_cause', label: 'Root Cause Analysis', icon: '🔍', description: 'Identifying root causes' },
-  { id: 'protocol_selection', label: 'Protocol Design', icon: '📜', description: 'Selecting natural therapies' },
+  { id: 'treatment_design', label: 'Protocol Design', icon: '📜', description: 'Selecting natural therapies' },
   { id: 'recommendation', label: 'Your Protocol', icon: '🌿', description: 'Your personalized plan' },
 ];
 
 export default function AssessmentProgress({ currentStep }) {
-  const currentIndex = steps.findIndex(s => s.id === currentStep);
+  let stepId = currentStep;
+  if (currentStep === 'complete') {
+    stepId = 'recommendation';
+  }
+  const currentIndex = steps.findIndex(s => s.id === stepId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

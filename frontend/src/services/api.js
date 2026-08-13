@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = typeof window !== 'undefined'
+  ? `${window.location.protocol}//${window.location.hostname}:8080`
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080');
 
 const fetchWithCredentials = async (url, options = {}) => {
   const finalOptions = {
@@ -51,7 +53,7 @@ export const naturopathyAPI = {
   },
 
   // Agent Endpoints
-  startSession: async (patientInfo) => {
+  startSession: async (patientInfo, mode = "question") => {
     try {
       const data = await fetchWithCredentials(`${API_BASE}/api/naturo/start`, {
         method: 'POST',
@@ -63,7 +65,8 @@ export const naturopathyAPI = {
             region: patientInfo.region || 'India',
             occupation: patientInfo.name || 'Not specified'
           },
-          session_id: null
+          session_id: null,
+          mode: mode || "question"
         })
       });
       return { session_id: data.session_id, message: data.message };
@@ -73,11 +76,11 @@ export const naturopathyAPI = {
     }
   },
   
-  sendMessage: async (sessionId, message) => {
+  sendMessage: async (sessionId, message, mode = null) => {
     try {
       return await fetchWithCredentials(`${API_BASE}/api/naturo/chat`, {
         method: 'POST',
-        body: JSON.stringify({ session_id: sessionId, message })
+        body: JSON.stringify({ session_id: sessionId, message, mode })
       });
     } catch(e) {
       // Mock response
@@ -90,12 +93,12 @@ export const naturopathyAPI = {
     }
   },
   
-  streamMessage: async function* (sessionId, message) {
+  streamMessage: async function* (sessionId, message, mode = null) {
     const res = await fetch(`${API_BASE}/api/naturo/chat_stream`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, message })
+      body: JSON.stringify({ session_id: sessionId, message, mode })
     });
 
     if (!res.ok) {
@@ -131,5 +134,85 @@ export const naturopathyAPI = {
   
   getSession: async (sessionId) => {
     return fetchWithCredentials(`${API_BASE}/api/session/${sessionId}`);
+  },
+
+  submitIntake: async (sessionId, userResponses) => {
+    return fetchWithCredentials(`${API_BASE}/api/naturo/submit_intake`, {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId, user_responses: userResponses })
+    });
+  },
+
+  // Practitioner Endpoints
+  getPendingCases: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/pending-cases`, {
+      method: 'GET'
+    });
+  },
+
+  getAdminCaseDetails: async (sessionId) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}`, {
+      method: 'GET'
+    });
+  },
+
+  approveCase: async (sessionId, approvalData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(approvalData)
+    });
+  },
+
+  // Patient History Endpoints
+  getPatientHistory: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/naturo/history`, {
+      method: 'GET'
+    });
+  },
+
+  getPatientCaseDetails: async (caseId) => {
+    return fetchWithCredentials(`${API_BASE}/api/naturo/cases/${caseId}`, {
+      method: 'GET'
+    });
+  },
+
+  deletePatientCase: async (caseId) => {
+    return fetchWithCredentials(`${API_BASE}/api/naturo/cases/${caseId}`, {
+      method: 'DELETE'
+    });
+  },
+
+
+  // Prescription Template Endpoints
+  getTemplates: async () => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
+      method: 'GET'
+    });
+  },
+
+  createTemplate: async (templateData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
+      method: 'POST',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  updateTemplate: async (templateId, templateData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates/${templateId}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  deleteTemplate: async (templateId) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/templates/${templateId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  generateAIPrescription: async (sessionId) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}/generate-ai-prescription`, {
+      method: 'POST'
+    });
   }
 };
