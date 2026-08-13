@@ -176,6 +176,13 @@ export const naturopathyAPI = {
     });
   },
 
+  deletePatientCase: async (caseId) => {
+    return fetchWithCredentials(`${API_BASE}/api/naturo/cases/${caseId}`, {
+      method: 'DELETE'
+    });
+  },
+
+
   // Prescription Template Endpoints
   getTemplates: async () => {
     return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {

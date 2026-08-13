@@ -4,8 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uuid
 import logging
+import sys
 import traceback
 from sqlalchemy.orm import Session
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +236,60 @@ def get_patient_case_details(
         "doctor_prescription": s.doctor_prescription,
         "doctor_notes": s.doctor_notes
     }
+
+@app.delete("/api/naturo/cases/{case_id}")
+def delete_patient_case(
+    case_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    try:
+        print(f"=== DELETE CASE {case_id} REQUEST RECEIVED ===")
+        sys.stdout.flush()
+        
+        current_user = get_optional_current_user(request, db)
+        if not current_user:
+            print("ERROR: Authentication failed during case deletion (current_user is None).")
+            sys.stdout.flush()
+            raise HTTPException(status_code=401, detail="Authentication required")
+            
+        print(f"User authenticated: {current_user.id}")
+        sys.stdout.flush()
+        
+        s = db.query(ConsultationSession).filter(
+            ConsultationSession.case_id == case_id,
+            ConsultationSession.user_id == current_user.id
+        ).first()
+        
+        if not s:
+            print(f"ERROR: Case {case_id} not found for user {current_user.id} in DB.")
+            sys.stdout.flush()
+            raise HTTPException(status_code=404, detail="Case not found")
+            
+        print(f"Case found in DB. Current status: '{s.status}'")
+        sys.stdout.flush()
+            
+        if s.status != 'pending_review':
+            print(f"ERROR: Case {case_id} status is '{s.status}', deletion forbidden. Must be 'pending_review'.")
+            sys.stdout.flush()
+            raise HTTPException(status_code=403, detail="Cannot delete a case that is already reviewed or in progress.")
+            
+        db.delete(s)
+        db.commit()
+        print(f"=== SUCCESSFULLY DELETED CASE {case_id} ===")
+        sys.stdout.flush()
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"=== UNEXPECTED ERROR DELETING CASE {case_id} ===")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 
 @app.post("/api/naturo/submit_intake", response_model=AssessmentResponse)
 async def submit_intake(

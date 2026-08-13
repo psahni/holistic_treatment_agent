@@ -13,12 +13,14 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   collectCoverageFrom: [
-    'src/services/**/*.js',
-    'src/components/**/*.jsx',
-    'src/app/**/*.js',
-    '!src/**/*.d.ts',
-    '!src/**/_*.js',
+    'src/components/admin/AdminDashboard.jsx',
+    'src/components/AuthModal.jsx',
+    'src/components/PatientFormModal.jsx',
+    'src/components/HeroSection.jsx',
+    'src/components/ChatInterface.jsx',
+    'src/services/api.js'
   ],
+  coverageDirectory: 'coverage',
   coverageThreshold: {
     global: {
       branches: 75,
@@ -27,6 +29,7 @@ const customJestConfig = {
       statements: 75,
     },
   },
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/playwright/'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

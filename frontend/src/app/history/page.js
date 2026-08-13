@@ -55,6 +55,26 @@ export default function PatientHistoryPage() {
     }
   };
 
+  const handleDeleteCase = async (caseId) => {
+    console.log("Attempting to delete case ID:", caseId);
+    if (!window.confirm("Are you sure you want to delete this case? This action cannot be undone.")) {
+      return;
+    }
+    setDetailLoading(true);
+    try {
+      const response = await naturopathyAPI.deletePatientCase(caseId);
+      console.log("Delete response:", response);
+      setSelectedCase(null);
+      loadData();
+    } catch (e) {
+      console.error('Failed to delete case - error object:', e);
+      console.error('Error details:', e.response?.data || e.message);
+      alert(`Failed to delete case. Error: ${e.response?.data?.detail || e.message}`);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -175,7 +195,7 @@ export default function PatientHistoryPage() {
                           <p style={{ color: 'var(--text-light)' }}>Loading details...</p>
                         </div>
                       ) : (
-                        <CaseDetailPanel caseData={selectedCase} />
+                        <CaseDetailPanel caseData={selectedCase} onDelete={handleDeleteCase} />
                       )}
                     </div>
                   )}
@@ -214,7 +234,7 @@ function NavBar({ user }) {
 }
 
 /* ─── Case Detail Panel ─── */
-function CaseDetailPanel({ caseData }) {
+function CaseDetailPanel({ caseData, onDelete }) {
   if (!caseData) return null;
 
   const hasPrescription = caseData.doctor_prescription && caseData.status === 'reviewed';
@@ -297,14 +317,27 @@ function CaseDetailPanel({ caseData }) {
       {caseData.status === 'pending_review' && (
         <div style={{
           textAlign: 'center', padding: '24px',
-          background: '#fef9e7', borderRadius: 'var(--radius-sm)', border: '1px solid #f9e79f'
+          background: '#fef9e7', borderRadius: 'var(--radius-sm)', border: '1px solid #f9e79f',
+          display: 'flex', flexDirection: 'column', alignItems: 'center'
         }}>
           <div style={{ fontSize: '2rem', marginBottom: '8px' }}>⏳</div>
           <p style={{ fontWeight: 600, marginBottom: '4px' }}>Awaiting Practitioner Review</p>
-          <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', margin: 0 }}>
+          <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', margin: '0 0 16px 0' }}>
             Your case has been submitted and is being reviewed by a certified AYUSH naturopathy practitioner.
             You will receive an email once the prescription is ready.
           </p>
+          <button 
+            onClick={() => onDelete(caseData.case_id)}
+            style={{ 
+              background: '#ffebee', color: '#c62828', border: '1px solid #ffcdd2', 
+              padding: '8px 16px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+              fontWeight: 500, transition: 'background 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = '#ffcdd2'}
+            onMouseOut={(e) => e.target.style.background = '#ffebee'}
+          >
+            Delete Case
+          </button>
         </div>
       )}
     </div>
