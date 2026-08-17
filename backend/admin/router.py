@@ -229,6 +229,14 @@ class ApproveCaseRequest(BaseModel):
     safety_precautions: str = ""
     doctor_notes: str = ""
 
+class GenerateAIPrescriptionRequest(BaseModel):
+    doctor_prompt: str
+
+class SaveDraftRequest(BaseModel):
+    prescription_text: str
+    safety_precautions: str = ""
+    doctor_notes: str = ""
+
 
 @router.get("/pending-cases")
 def list_pending_cases(admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
@@ -289,7 +297,11 @@ def get_case_details(session_id: str, admin: str = Depends(get_current_admin), d
         "protocols_recommended": s.protocols_recommended,
         "status": s.status,
         "doctor_prescription": s.doctor_prescription,
-        "doctor_notes": s.doctor_notes
+        "doctor_notes": s.doctor_notes,
+        "vitals": s.vitals,
+        "medical_history": s.medical_history,
+        "current_medications": s.current_medications,
+        "investigations": s.investigations
     }
 
 
@@ -349,6 +361,28 @@ def approve_case(session_id: str, req: ApproveCaseRequest, admin: str = Depends(
         session_store.save_session(session_id, state)
         
     return {"message": "Case reviewed and prescription submitted successfully"}
+
+@router.post("/cases/{session_id}/draft")
+def save_draft(session_id: str, req: SaveDraftRequest, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    import uuid
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session ID")
+        
+    s = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    s.doctor_prescription = {
+        "prescription_text": req.prescription_text,
+        "safety_precautions": req.safety_precautions,
+        "is_draft": True
+    }
+    s.doctor_notes = req.doctor_notes
+    db.commit()
+    
+    return {"message": "Draft saved successfully"}
 
 
 # Pydantic models
@@ -410,9 +444,20 @@ def delete_template(template_id: int, admin: str = Depends(get_current_admin), d
 
 # POST /api/admin/cases/{session_id}/generate-ai-prescription
 @router.post('/cases/{session_id}/generate-ai-prescription')
-async def generate_ai_prescription(session_id: str, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """On-demand AI prescription generation — doctor clicks a button to invoke this."""
-    from naturopathy.agent import agent
+async def generate_ai_prescription(session_id: str, req: GenerateAIPrescriptionRequest, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """On-demand AI prescription generation using a doctor's prompt."""
+    
+    if not req.doctor_prompt or len(req.doctor_prompt.strip()) < 5:
+        raise HTTPException(status_code=400, detail="A valid clinical prompt is required.")
+        
+    # Simple context engineering / validation: Ensure prompt is clinically oriented
+    lower_prompt = req.doctor_prompt.lower()
+    clinical_keywords = ['day', 'days', 'prescription', 'subscription', 'diet', 'focus', 'treat', 'patient', 'medication', 'investigation', 'generate', 'create', 'make', 'plan', 'notes', 'health', 'wellness']
+    if not any(k in lower_prompt for k in clinical_keywords):
+        raise HTTPException(status_code=400, detail="Prompt does not appear to be clinically relevant. Please provide specific instructions for the prescription.")
+
+    from naturopathy.agent import NaturopathyAgent
+    agent = NaturopathyAgent()
     from memory.session_store import session_store
     import uuid
     
@@ -435,11 +480,19 @@ async def generate_ai_prescription(session_id: str, admin: str = Depends(get_cur
         state["step"] = "root_cause"
         state["mode"] = "treatment"
     
+    # Inject doctor's prompt into the context by adding a system message or user message at the end
+    doctor_instruction = f"Dr. Note for Prescription Generation: {req.doctor_prompt}. Please draft the official prescription accordingly."
+    state["conversation_history"].append({"role": "user", "content": doctor_instruction})
+    
     try:
         import logging
         logger = logging.getLogger(__name__)
         final_state = await agent.graph.ainvoke(state)
         
+        # Remove the injected instruction so it doesn't stay in the history forever
+        if state["conversation_history"] and state["conversation_history"][-1]["content"] == doctor_instruction:
+            state["conversation_history"].pop()
+            
         # Extract the generated prescription
         daily_routine = final_state.get("final_report", {}).get("daily_routine", "")
         root_causes = final_state.get("root_causes", [])
@@ -448,6 +501,9 @@ async def generate_ai_prescription(session_id: str, admin: str = Depends(get_cur
         
         # Format into a readable prescription text
         prescription_parts = []
+        if req.doctor_prompt:
+            prescription_parts.append(f"AI Generation Prompt: {req.doctor_prompt}\n")
+        
         if daily_routine:
             prescription_parts.append(f"DAILY ROUTINE:\n{daily_routine}")
         if diet:

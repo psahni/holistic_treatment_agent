@@ -54,6 +54,12 @@ class ConsultationSession(Base):
     doctor_notes = Column(String, nullable=True)
     case_id = Column(Integer, Sequence('consultation_sessions_case_id_seq'), unique=True)
     
+    # Clinical Details for Admin Review
+    vitals = Column(JSON, nullable=True)
+    medical_history = Column(String, nullable=True)
+    current_medications = Column(JSON, nullable=True)
+    investigations = Column(String, nullable=True)
+    
     user = relationship("User", back_populates="sessions")
 
 class PrescriptionTemplate(Base):
@@ -113,6 +119,16 @@ def run_migrations(bind_engine):
                 else:
                     conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN case_id INTEGER"))
                 logger.info("Added case_id column to consultation_sessions table")
+            
+            if "vitals" not in columns:
+                conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN vitals JSON"))
+            if "medical_history" not in columns:
+                conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN medical_history VARCHAR"))
+            if "current_medications" not in columns:
+                conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN current_medications JSON"))
+            if "investigations" not in columns:
+                conn.execute(text("ALTER TABLE consultation_sessions ADD COLUMN investigations VARCHAR"))
+                logger.info("Added clinical detail columns to consultation_sessions table")
     except Exception as e:
         logger.warning(f"Failed to auto-migrate consultation_sessions table: {e}")
 
@@ -244,7 +260,8 @@ def save_completed_session(db, session_id: str, user_id: str, state: dict):
                 protocols_recommended=state.get("final_report", {}),
                 completed_at=datetime.now(timezone.utc),
                 need_practitioner=state.get("need_practitioner", False),
-                status="pending_review"
+                status="pending_review",
+                investigations=state.get("patient_info", {}).get("investigations", "")
             )
             db.add(session)
             db.commit()

@@ -3,7 +3,7 @@ import { naturopathyAPI } from '../services/api';
 
 export default function PatientFormModal({ isOpen, onClose, onStart }) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ name: '', age: '', gender: '', region: '' });
+  const [formData, setFormData] = useState({ name: '', age: '', gender: '', region: '', investigations: '' });
 
   if (!isOpen) return null;
 
@@ -65,8 +65,20 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
               className="form-input" 
               placeholder="Region (e.g. India)" 
               required 
-              value={formData.region} 
               onChange={e => setFormData({...formData, region: e.target.value})} 
+            />
+          </div>
+          
+          <div className="form-group" style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: 500 }}>
+              Share your previous investigation results <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: '#888' }}>(Optional)</span>
+            </label>
+            <textarea 
+              className="form-input" 
+              placeholder="e.g. Recent blood tests, vitamin deficiencies, specific lab values..." 
+              value={formData.investigations || ''} 
+              onChange={e => setFormData({...formData, investigations: e.target.value})} 
+              style={{ height: '80px', resize: 'vertical', fontFamily: 'inherit' }}
             />
           </div>
           

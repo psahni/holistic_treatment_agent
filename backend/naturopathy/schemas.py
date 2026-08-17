@@ -6,6 +6,7 @@ class PatientInfo(BaseModel):
     gender: str
     region: str
     occupation: str
+    investigations: Optional[str] = ""
 
 class SymptomInput(BaseModel):
     session_id: Optional[str] = None
