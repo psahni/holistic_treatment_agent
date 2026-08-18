@@ -61,15 +61,15 @@
 │                      KNOWLEDGE & MEMORY LAYER                            │
 │                                                                          │
 │  ┌──────────────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   Knowledge Base     │  │  Session     │  │  Patient Profile     │  │
-│  │   (JSON / RAG)       │  │  Store       │  │  Store               │  │
+│  │   Vector DB          │  │  Session     │  │  Patient Profile     │  │
+│  │   (Qdrant)           │  │  Store       │  │  Store               │  │
 │  │                      │  │              │  │                      │  │
 │  │ • 15 condition       │  │ • Redis      │  │ • PostgreSQL         │  │
-│  │   protocols (40KB)   │  │   (primary)  │  │ • PatientProfile     │  │
-│  │ • Diet therapy (11KB)│  │ • In-memory  │  │ • ConsultationSession│  │
-│  │ • Hydrotherapy (11KB)│  │   (fallback) │  │                      │  │
+│  │   protocols          │  │   (primary)  │  │ • PatientProfile     │  │
+│  │ • Diet therapy       │  │ • In-memory  │  │ • ConsultationSession│  │
+│  │ • Hydrotherapy       │  │   (fallback) │  │                      │  │
 │  │ • Detox protocols    │  │ • 1hr TTL    │  │ (graceful fallback   │  │
-│  │ • Herb-drug (19KB)   │  │              │  │  if DB unavailable)  │  │
+│  │ • Herb-drug inter.   │  │              │  │  if DB unavailable)  │  │
 │  └──────────────────────┘  └──────────────┘  └──────────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -253,7 +253,7 @@ sequenceDiagram
     participant G as Input Guardrails
     participant A as LangGraph Agent
     participant L as Gemini LLM
-    participant K as Knowledge Base
+    participant K as Vector DB (Qdrant)
     participant S as Session Store (Redis)
 
     P->>F: Fill patient info form (age, gender, region)
@@ -287,7 +287,7 @@ sequenceDiagram
 
     A->>L: root_cause_node → Gemini (analyze all data)
     L-->>A: Structured root causes [{cause, category, severity}]
-    A->>K: Load naturopathy_protocols.json + diet_therapy.json + ...
+    A->>K: Semantic Search (RAG) for matching protocols
     A->>L: protocol_selection_node → Gemini (match protocols)
     L-->>A: Selected protocols [{type, name, duration, frequency}]
     A->>L: recommendation_node → Gemini (generate 30-day plan)
