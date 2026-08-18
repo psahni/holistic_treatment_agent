@@ -63,7 +63,8 @@ export const naturopathyAPI = {
             age: parseInt(patientInfo.age) || 30,
             gender: patientInfo.gender || 'other',
             region: patientInfo.region || 'India',
-            occupation: patientInfo.name || 'Not specified'
+            occupation: patientInfo.name || 'Not specified',
+            investigations: patientInfo.investigations || ''
           },
           session_id: null,
           mode: mode || "question"
@@ -144,9 +145,10 @@ export const naturopathyAPI = {
   },
 
   // Practitioner Endpoints
-  getPendingCases: async () => {
+  getPendingCases: async (options = {}) => {
     return fetchWithCredentials(`${API_BASE}/api/admin/pending-cases`, {
-      method: 'GET'
+      method: 'GET',
+      ...options
     });
   },
 
@@ -184,9 +186,10 @@ export const naturopathyAPI = {
 
 
   // Prescription Template Endpoints
-  getTemplates: async () => {
+  getTemplates: async (options = {}) => {
     return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
-      method: 'GET'
+      method: 'GET',
+      ...options
     });
   },
 
@@ -210,9 +213,17 @@ export const naturopathyAPI = {
     });
   },
 
-  generateAIPrescription: async (sessionId) => {
+  generateAIPrescription: async (sessionId, doctorPrompt) => {
     return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}/generate-ai-prescription`, {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({ doctor_prompt: doctorPrompt })
+    });
+  },
+
+  saveDraft: async (sessionId, draftData) => {
+    return fetchWithCredentials(`${API_BASE}/api/admin/cases/${sessionId}/draft`, {
+      method: 'POST',
+      body: JSON.stringify(draftData)
     });
   }
 };

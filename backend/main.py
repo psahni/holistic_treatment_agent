@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 from config import get_settings
 from naturopathy.schemas import SymptomInput, ChatRequest, AssessmentResponse, IntakeSubmitRequest
-from naturopathy.agent import NaturopathyAgent
+from naturopathy.agent import NaturopathyAgent, naturopathy_agent_instance as agent
 from guardrails.input_guardrails import run_input_guardrails
 from guardrails.output_guardrails import run_output_guardrails
 from memory.session_store import session_store
@@ -50,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-agent = NaturopathyAgent()
+# Using singleton agent from naturopathy.agent
 
 @app.post("/api/naturo/start", response_model=AssessmentResponse)
 async def start_session(symptom_input: SymptomInput, request: Request, db: Session = Depends(get_db)):

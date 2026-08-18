@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Clock, User, FileText, Send, Plus, Edit3, Sparkles, BookOpen, X, Save } from 'lucide-react';
+import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Clock, User, FileText, Send, Plus, Edit3, Sparkles, BookOpen, X, Save, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { naturopathyAPI } from '../../services/api';
 
 export default function AdminDashboard({ onLogout }) {
@@ -18,9 +18,15 @@ export default function AdminDashboard({ onLogout }) {
   const [pendingCases, setPendingCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
   const [loadingCases, setLoadingCases] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [prescriptionForm, setPrescriptionForm] = useState({ prescription_text: '', safety_precautions: '', doctor_notes: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [doctorPrompt, setDoctorPrompt] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showSampleLayout, setShowSampleLayout] = useState(false);
+  const [successModal, setSuccessModal] = useState({ show: false, title: '', message: '' });
   
   // Template states
   const [templates, setTemplates] = useState([]);
@@ -40,21 +46,29 @@ export default function AdminDashboard({ onLogout }) {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     if (activeTab === 'practitioner') {
-      fetchPendingCases();
-      fetchTemplates();
+      fetchPendingCases({ signal });
+      fetchTemplates({ signal });
     } else if (activeTab === 'templates') {
-      fetchTemplates();
+      fetchTemplates({ signal });
     }
+
+    return () => {
+      controller.abort();
+    };
   }, [activeTab]);
 
   // ─── Template APIs ─────────────────────────────────
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (options = {}) => {
     setLoadingTemplates(true);
     try {
-      const res = await naturopathyAPI.getTemplates();
+      const res = await naturopathyAPI.getTemplates(options);
       setTemplates(Array.isArray(res) ? res : []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch templates:", err);
     } finally {
       setLoadingTemplates(false);
@@ -71,11 +85,14 @@ export default function AdminDashboard({ onLogout }) {
 
   const handleGenerateAI = async () => {
     if (!selectedCase) return;
-    if (!confirm('This will use AI to generate a prescription for this case. This may take 15-30 seconds. Continue?')) return;
+    if (!doctorPrompt.trim()) {
+      alert("Please provide a prompt for the AI prescription generator.");
+      return;
+    }
     
     setGeneratingAI(true);
     try {
-      const res = await naturopathyAPI.generateAIPrescription(selectedCase.session_id);
+      const res = await naturopathyAPI.generateAIPrescription(selectedCase.session_id, doctorPrompt);
       setPrescriptionForm(prev => ({
         ...prev,
         prescription_text: res.prescription_text || prev.prescription_text,
@@ -83,9 +100,25 @@ export default function AdminDashboard({ onLogout }) {
       }));
     } catch (err) {
       console.error("AI generation failed:", err);
-      alert("AI generation failed. Please try again or use a template.");
+      const errorMsg = err.response?.data?.detail || err.message || "AI generation failed. Please try again or use a template.";
+      alert(errorMsg);
     } finally {
       setGeneratingAI(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!selectedCase) return;
+    setSavingDraft(true);
+    try {
+      await naturopathyAPI.saveDraft(selectedCase.session_id, prescriptionForm);
+      setSuccessModal({ show: true, title: "Draft Saved", message: "Your prescription draft has been saved successfully. You can return to this case later to complete it." });
+      await fetchPendingCases();
+    } catch (err) {
+      console.error("Draft save failed:", err);
+      alert("Failed to save draft.");
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -157,12 +190,13 @@ export default function AdminDashboard({ onLogout }) {
   };
 
   // ─── Practitioner Console ─────────────────────────
-  const fetchPendingCases = async () => {
+  const fetchPendingCases = async (options = {}) => {
     setLoadingCases(true);
     try {
-      const res = await naturopathyAPI.getPendingCases();
+      const res = await naturopathyAPI.getPendingCases(options);
       setPendingCases(res.cases || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch pending cases:", err);
     } finally {
       setLoadingCases(false);
@@ -176,12 +210,13 @@ export default function AdminDashboard({ onLogout }) {
       const res = await naturopathyAPI.getAdminCaseDetails(caseRecord.session_id);
       setSelectedCase(res);
       
-      // Start with empty form — doctor picks a template or generates with AI
+      // Start with loaded draft or empty form
       setPrescriptionForm({
-        prescription_text: '',
-        safety_precautions: '',
-        doctor_notes: ''
+        prescription_text: res.doctor_prescription?.prescription_text || '',
+        safety_precautions: res.doctor_prescription?.safety_precautions || '',
+        doctor_notes: res.doctor_notes || ''
       });
+      setDoctorPrompt('');
     } catch (err) {
       console.error("Failed to fetch case details:", err);
       alert("Failed to load case details.");
@@ -190,13 +225,13 @@ export default function AdminDashboard({ onLogout }) {
     }
   };
 
-  const handleSubmitApproval = async (e) => {
-    e.preventDefault();
+  const handleSubmitApproval = async () => {
     if (!selectedCase) return;
     setSubmittingReview(true);
     try {
       await naturopathyAPI.approveCase(selectedCase.session_id, prescriptionForm);
-      alert("Prescription submitted successfully! Patient has been emailed.");
+      setSuccessModal({ show: true, title: "Prescription Sent", message: "Prescription submitted successfully! The patient has been emailed." });
+      setShowPreviewModal(false);
       setSelectedCase(null);
       setPrescriptionForm({ prescription_text: '', safety_precautions: '', doctor_notes: '' });
       await fetchPendingCases();
@@ -688,48 +723,113 @@ export default function AdminDashboard({ onLogout }) {
           /* ═══════════════════════════════════════════════
              PRACTITIONER CONSOLE TAB
              ═══════════════════════════════════════════════ */
-          <div className="admin-grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px' }}>
+          <div className="admin-grid" style={{ display: 'grid', gridTemplateColumns: sidebarOpen ? '320px 1fr' : '60px 1fr', gap: '24px', transition: 'grid-template-columns 0.3s ease' }}>
             {/* Pending Cases Queue */}
-            <section className="admin-card" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-              <div className="card-header">
-                <h2>Pending Cases ({pendingCases.length})</h2>
+            <section 
+              className={sidebarOpen ? "admin-card" : ""} 
+              style={{ 
+                maxHeight: 'calc(100vh - 200px)', 
+                overflowY: 'auto', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                padding: sidebarOpen ? undefined : '0',
+                background: sidebarOpen ? undefined : 'transparent',
+                boxShadow: sidebarOpen ? undefined : 'none'
+              }}
+            >
+              <div 
+                className={sidebarOpen ? "card-header" : ""} 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: sidebarOpen ? 'space-between' : 'center', 
+                  alignItems: 'center', 
+                  paddingBottom: sidebarOpen ? undefined : '16px', 
+                  borderBottom: sidebarOpen ? undefined : 'none',
+                  marginTop: sidebarOpen ? '0' : '8px'
+                }}
+              >
+                {sidebarOpen && <h2>Pending Cases ({pendingCases.length})</h2>}
+                <button 
+                  onClick={() => setSidebarOpen(!sidebarOpen)} 
+                  style={{ 
+                    background: sidebarOpen ? 'none' : '#fff', 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    color: 'var(--forest)', 
+                    padding: '8px', 
+                    borderRadius: '50%',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    boxShadow: sidebarOpen ? 'none' : '0 2px 5px rgba(0,0,0,0.1)'
+                  }}
+                  title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                >
+                  {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+                </button>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                {loadingCases ? (
-                  <div className="text-center" style={{ padding: '2rem' }}><RefreshCw className="spin-icon" /> Loading...</div>
-                ) : pendingCases.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>No pending cases.</div>
-                ) : (
-                  pendingCases.map(c => (
+              
+              {sidebarOpen ? (
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                  {loadingCases ? (
+                    <div className="text-center" style={{ padding: '2rem' }}><RefreshCw className="spin-icon" /> Loading...</div>
+                  ) : pendingCases.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>No pending cases.</div>
+                  ) : (
+                    pendingCases.map(c => (
+                      <div 
+                        key={c.session_id} 
+                        onClick={() => handleSelectCase(c)}
+                        style={{ 
+                          padding: '16px', 
+                          borderRadius: '8px', 
+                          border: selectedCase?.session_id === c.session_id ? '2px solid var(--forest)' : '1px solid #ddd',
+                          background: selectedCase?.session_id === c.session_id ? '#f3f6f3' : '#fff',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: 'var(--forest)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <User size={14} /> {c.patient_name}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          Symptoms: {c.symptoms || 'General Inquiry'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={10} /> Case ID: {c.case_id}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', paddingTop: '16px' }}>
+                  {pendingCases.map(c => (
                     <div 
                       key={c.session_id} 
                       onClick={() => handleSelectCase(c)}
+                      title={c.patient_name}
                       style={{ 
-                        padding: '16px', 
-                        borderRadius: '8px', 
-                        border: selectedCase?.session_id === c.session_id ? '2px solid var(--forest)' : '1px solid #ddd',
-                        background: selectedCase?.session_id === c.session_id ? '#f3f6f3' : '#fff',
-                        cursor: 'pointer',
+                        cursor: 'pointer', 
+                        color: selectedCase?.session_id === c.session_id ? 'var(--forest)' : '#718096',
+                        background: selectedCase?.session_id === c.session_id ? '#e6f0e6' : 'transparent',
+                        padding: '10px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         transition: 'all 0.2s'
                       }}
                     >
-                      <div style={{ fontWeight: 600, color: 'var(--forest)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <User size={14} /> {c.patient_name}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        Symptoms: {c.symptoms || 'General Inquiry'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={10} /> Case ID: {c.case_id}
-                      </div>
+                      <User size={20} />
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Case Details and Review Panel */}
-            <section className="admin-card" style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+            <section className="admin-card" style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', padding: 0 }}>
               {loadingDetails ? (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', padding: '64px' }}>
                   <RefreshCw className="spin-icon" size={32} />
@@ -741,142 +841,336 @@ export default function AdminDashboard({ onLogout }) {
                   <span>Select a patient from the queue to start review</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                  {/* Patient Info Header */}
-                  <div style={{ borderBottom: '1px solid #ddd', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h2 style={{ color: 'var(--forest)', margin: 0 }}>Review Case: {selectedCase.patient_name}</h2>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#666' }}>
-                        {selectedCase.patient_email} • {selectedCase.age} years • {selectedCase.gender} • {selectedCase.region}
-                      </p>
+                <div style={{ display: 'flex', height: '100%', flexDirection: 'row' }}>
+                  
+                  {/* Left Side: Patient Details */}
+                  <div style={{ width: '40%', borderRight: '1px solid #ddd', padding: '24px', overflowY: 'auto', background: '#fafaf9' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                      <div>
+                        <h2 style={{ margin: 0, color: 'var(--forest-dark)', fontSize: '1.4rem' }}>{selectedCase.patient_name}</h2>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>MRN-{selectedCase.case_id.toString().padStart(8, '0')}</div>
+                      </div>
+                      <span className="badge badge-warning" style={{ background: '#feebc8', color: '#c05621', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                        Pending Review
+                      </span>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span className="badge badge-success" style={{ background: '#feebc8', color: '#c05621', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600 }}>Awaiting Review</span>
-                      <div style={{ fontSize: '0.8rem', color: '#999', marginTop: '4px' }}>Case ID: {selectedCase.case_id}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <span><Clock size={12} style={{display:'inline', verticalAlign:'text-bottom'}}/> {selectedCase.created_at || new Date().toLocaleDateString()}</span>
+                      <span>Age {selectedCase.age}</span>
+                      <span>{selectedCase.gender}</span>
                     </div>
-                  </div>
 
-                  {/* Patient Intake Transcript */}
-                  <div>
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>💬 Patient Intake Transcript</h3>
-                    <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', maxHeight: '300px', overflowY: 'auto', background: '#fafaf9', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {selectedCase.conversation_history?.map((msg, idx) => (
-                        <div key={idx} style={{ 
-                          alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                          maxWidth: '85%',
-                          padding: '10px 14px',
-                          borderRadius: '8px',
-                          background: msg.role === 'user' ? '#fef3c7' : '#fff',
-                          border: '1px solid #e5e5e0',
-                          fontSize: '0.9rem',
-                          lineHeight: '1.4'
-                        }}>
-                          <strong>{msg.role === 'user' ? 'Patient' : 'Agent'}:</strong> {msg.content}
-                        </div>
-                      ))}
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Chief Complaint</h4>
+                      <div style={{ background: '#e2e8f0', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', color: '#2d3748', borderLeft: '4px solid var(--forest)' }}>
+                        "{selectedCase.conversation_history?.[0]?.content || selectedCase.symptoms || 'General wellness consultation.'}"
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Prescription Form */}
-                  <form onSubmit={handleSubmitApproval} style={{ borderTop: '1px solid #ddd', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <h3 style={{ fontSize: '1.2rem', margin: 0 }}>🧑‍⚕️ Issue Official AYUSH Prescription</h3>
-                    
-                    {/* Template Selector + AI Generate */}
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '200px' }}>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#666', marginBottom: '6px' }}>
-                          Load from Template:
-                        </label>
+                    {selectedCase.vitals && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Vitals</h4>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {loadingTemplates ? (
-                            <span style={{ fontSize: '0.85rem', color: '#888' }}>Loading templates...</span>
-                          ) : templates.length === 0 ? (
-                            <span style={{ fontSize: '0.85rem', color: '#888' }}>No templates available.</span>
-                          ) : (
-                            templates.map(t => {
-                              const catStyle = getCategoryStyle(t.category);
-                              return (
-                                <button 
-                                  key={t.id}
-                                  type="button" 
-                                  className="admin-btn-outline btn-small" 
-                                  onClick={() => handleApplyTemplate(t)}
-                                  title={t.name}
-                                  style={{ 
-                                    fontSize: '0.8rem', padding: '6px 12px',
-                                    borderColor: catStyle.color,
-                                    color: catStyle.color,
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  {t.category}
-                                </button>
-                              );
-                            })
-                          )}
+                          {Object.entries(selectedCase.vitals).map(([key, val]) => (
+                            <div key={key} style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '8px 12px', textAlign: 'center', flex: '1 1 calc(33% - 8px)' }}>
+                              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--forest)' }}>{val}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#888', textTransform: 'uppercase' }}>{key}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
+                    )}
+
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Reported Symptoms</h4>
+                      <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.9rem', color: '#4a5568', lineHeight: '1.6' }}>
+                        {selectedCase.conversation_history?.filter(m => m.role === 'user').slice(1).map((msg, i) => (
+                          <li key={i}>{msg.content}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {selectedCase.medical_history && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Medical History</h4>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: '#4a5568', lineHeight: '1.5' }}>
+                          {selectedCase.medical_history}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedCase.current_medications && selectedCase.current_medications.length > 0 && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Current Medications</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {selectedCase.current_medications.map((med, i) => (
+                            <div key={i} style={{ background: '#fff', border: '1px solid #ddd', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem', color: '#4a5568' }}>
+                              💊 {med}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedCase.investigations && (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Investigations</h4>
+                        <div style={{ background: '#ebf8fa', border: '1px solid #b2ebf2', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', color: '#00838f', lineHeight: '1.5' }}>
+                          {selectedCase.investigations}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Side: Treatment Plan */}
+                  <div style={{ width: '60%', padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', background: '#fff' }}>
+                    
+                    <div>
+                      <h2 style={{ margin: 0, color: 'var(--forest-dark)', fontSize: '1.5rem', marginBottom: '4px' }}>Treatment Plan</h2>
+                      <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>Generate or write a prescription for <strong>{selectedCase.patient_name}</strong>.</p>
+                    </div>
+
+                    {/* AI Prescription Generator */}
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h3 style={{ margin: 0, fontSize: '1rem', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Sparkles size={16} color="#667eea" /> AI Prescription Generator
+                        </h3>
+                        <button 
+                          type="button" 
+                          className="admin-btn-outline btn-small"
+                          onClick={() => setShowSampleLayout(true)}
+                          style={{ fontSize: '0.75rem', padding: '4px 8px', borderColor: '#cbd5e0', color: '#4a5568' }}
+                        >
+                          View Sample Layout
+                        </button>
+                      </div>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#718096' }}>
+                        Describe your clinical intent — the AI drafts a structured prescription using the patient record.
+                      </p>
+                      
+                      {/* Optional: Template selector could go here if still wanted */}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        {templates.map(t => (
+                          <button 
+                            key={t.id}
+                            type="button" 
+                            onClick={() => { setDoctorPrompt(t.name); handleApplyTemplate(t); }}
+                            style={{ background: '#e2e8f0', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.75rem', color: '#4a5568', cursor: 'pointer' }}
+                          >
+                            Load: {t.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      <textarea
+                        value={doctorPrompt}
+                        onChange={(e) => setDoctorPrompt(e.target.value)}
+                        placeholder="e.g. Generate 5 days subscription focusing on gut health..."
+                        style={{ width: '100%', height: '80px', padding: '12px', border: '1px solid #cbd5e0', borderRadius: '8px', resize: 'vertical', fontSize: '0.9rem', marginBottom: '12px', outline: 'none' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button 
+                          type="button"
+                          onClick={handleGenerateAI}
+                          disabled={generatingAI}
+                          style={{ 
+                            display: 'flex', gap: '6px', alignItems: 'center', padding: '10px 20px',
+                            background: generatingAI ? '#cbd5e0' : 'var(--forest-dark)',
+                            color: '#fff', border: 'none', borderRadius: '8px',
+                            fontWeight: 600, fontSize: '0.9rem', cursor: generatingAI ? 'wait' : 'pointer',
+                          }}
+                        >
+                          {generatingAI ? <RefreshCw size={16} className="spin-icon" /> : <Sparkles size={16} />}
+                          {generatingAI ? 'Generating...' : 'Generate Prescription'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Prescription Box */}
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, fontSize: '1rem', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Edit3 size={16} /> Prescription <span style={{ background: '#edf2f7', color: '#718096', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>Editable</span>
+                        </h3>
+                        <button 
+                          type="button" 
+                          onClick={handleSaveDraft}
+                          disabled={savingDraft}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: '1px solid #cbd5e0', borderRadius: '6px', padding: '6px 12px', fontSize: '0.8rem', color: '#4a5568', cursor: 'pointer', transition: '0.2s' }}
+                        >
+                          {savingDraft ? <RefreshCw size={14} className="spin-icon" /> : <Save size={14} />}
+                          {savingDraft ? 'Saving...' : 'Save as Draft'}
+                        </button>
+                      </div>
+                      <textarea
+                        value={prescriptionForm.prescription_text}
+                        onChange={(e) => setPrescriptionForm({...prescriptionForm, prescription_text: e.target.value})}
+                        style={{ width: '100%', height: '200px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.9rem', outline: 'none', background: '#fcfcfc' }}
+                        placeholder="AI drafted prescription will appear here..."
+                      />
+                    </div>
+
+                    {/* Treatment Notes Box */}
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FileText size={16} /> Treatment Notes & Red Flags
+                      </h3>
+                      <textarea
+                        value={prescriptionForm.safety_precautions}
+                        onChange={(e) => setPrescriptionForm({...prescriptionForm, safety_precautions: e.target.value})}
+                        style={{ width: '100%', height: '100px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', resize: 'vertical', fontSize: '0.9rem', outline: 'none', background: '#fcfcfc' }}
+                        placeholder="Write additional treatment context, clinical reasoning, referrals, dietary advice, and follow-up instructions here."
+                      />
+                    </div>
+
+                    {/* Bottom Action Bar */}
+                    <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <button 
-                        type="button"
-                        onClick={handleGenerateAI}
-                        disabled={generatingAI}
-                        style={{ 
-                          display: 'flex', gap: '6px', alignItems: 'center', padding: '8px 16px',
-                          background: generatingAI ? '#f0f0f0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          color: generatingAI ? '#888' : '#fff', border: 'none', borderRadius: '6px',
-                          fontWeight: 600, fontSize: '0.85rem', cursor: generatingAI ? 'wait' : 'pointer',
-                          opacity: generatingAI ? 0.7 : 1
-                        }}
+                        type="button" 
+                        onClick={handleSaveDraft}
+                        disabled={savingDraft}
+                        style={{ background: 'none', border: '1px solid #cbd5e0', borderRadius: '8px', padding: '10px 16px', fontSize: '0.9rem', color: '#4a5568', cursor: 'pointer', display: 'flex', gap: '6px', alignItems: 'center' }}
                       >
-                        {generatingAI ? <RefreshCw size={14} className="spin-icon" /> : <Sparkles size={14} />}
-                        {generatingAI ? 'Generating...' : 'Generate with AI'}
+                        <Save size={16} /> Save Prescription & Notes as Draft
                       </button>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '6px' }}>Naturopathy Protocol Plan (Text)</label>
-                        <textarea 
-                          required
-                          value={prescriptionForm.prescription_text}
-                          onChange={e => setPrescriptionForm({...prescriptionForm, prescription_text: e.target.value})}
-                          style={{ width: '100%', height: '180px', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', outline: 'none', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.9rem' }}
-                          placeholder="Write or select a template above. You can edit the text before approving."
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '6px' }}>Red Flags & Contraindications</label>
-                          <textarea 
-                            value={prescriptionForm.safety_precautions}
-                            onChange={e => setPrescriptionForm({...prescriptionForm, safety_precautions: e.target.value})}
-                            style={{ width: '100%', height: '70px', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', outline: 'none', resize: 'none', fontSize: '0.9rem' }}
-                            placeholder="Things to watch out for or avoid..."
-                          />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, marginBottom: '6px' }}>Doctor Confidential Notes</label>
-                          <textarea 
-                            value={prescriptionForm.doctor_notes}
-                            onChange={e => setPrescriptionForm({...prescriptionForm, doctor_notes: e.target.value})}
-                            style={{ width: '100%', height: '70px', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', outline: 'none', resize: 'none', fontSize: '0.9rem' }}
-                            placeholder="Follow up schedule, reference details..."
-                          />
-                        </div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => setPrescriptionForm({ prescription_text: '', safety_precautions: '', doctor_notes: '' })}
+                          style={{ background: 'none', border: 'none', padding: '10px 16px', fontSize: '0.9rem', color: '#718096', cursor: 'pointer' }}
+                        >
+                          Clear All
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPreviewModal(true)}
+                          disabled={!prescriptionForm.prescription_text}
+                          className="admin-btn-primary"
+                          style={{ padding: '10px 24px', display: 'flex', gap: '8px', alignItems: 'center', borderRadius: '8px' }}
+                        >
+                          <Send size={16} /> Preview & Submit
+                        </button>
                       </div>
                     </div>
-
-                    <button type="submit" className="admin-btn-primary" style={{ alignSelf: 'flex-end', padding: '12px 24px', display: 'flex', gap: '8px', alignItems: 'center' }} disabled={submittingReview}>
-                      {submittingReview ? <RefreshCw className="spin-icon" size={16} /> : <CheckCircle size={16} />}
-                      {submittingReview ? 'Submitting...' : 'Approve & Send Prescription'}
-                    </button>
-                  </form>
+                    
+                  </div>
                 </div>
               )}
             </section>
           </div>
         )}
       </main>
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#2d3748' }}>Review Prescription</h2>
+              <button onClick={() => setShowPreviewModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a0aec0' }}><X size={24} /></button>
+            </div>
+            
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '0.85rem', color: '#718096', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>Patient Details</h3>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', color: '#2d3748' }}>
+                  <span><strong>Name:</strong> {selectedCase?.patient_name}</span>
+                  <span><strong>Age:</strong> {selectedCase?.age}</span>
+                  <span><strong>Gender:</strong> {selectedCase?.gender}</span>
+                </div>
+              </div>
+              
+              <div>
+                <h3 style={{ fontSize: '0.85rem', color: '#718096', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>Official Prescription</h3>
+                <div style={{ background: '#fcfcfc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '0.9rem', color: '#2d3748', lineHeight: '1.5' }}>
+                  {prescriptionForm.prescription_text}
+                </div>
+              </div>
+              
+              {prescriptionForm.safety_precautions && (
+                <div>
+                  <h3 style={{ fontSize: '0.85rem', color: '#718096', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>Treatment Notes / Red Flags</h3>
+                  <div style={{ background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', padding: '12px', fontSize: '0.9rem', color: '#c53030' }}>
+                    {prescriptionForm.safety_precautions}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div style={{ padding: '20px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button onClick={() => setShowPreviewModal(false)} style={{ background: 'none', border: '1px solid #cbd5e0', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#4a5568' }}>Back to Edit</button>
+              <button onClick={handleSubmitApproval} disabled={submittingReview} style={{ background: 'var(--forest)', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {submittingReview ? <RefreshCw className="spin-icon" size={18} /> : <CheckCircle size={18} />}
+                {submittingReview ? 'Submitting...' : 'Confirm & Send to Patient'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sample Layout Modal / Dump Component */}
+      {showSampleLayout && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '600px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#2d3748' }}>Prescription Sample Layout</h3>
+              <button onClick={() => setShowSampleLayout(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a0aec0' }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '24px', fontSize: '0.9rem', color: '#4a5568', lineHeight: '1.6' }}>
+              <p>For best results, instruct the AI to generate or format the prescription using this standard structure:</p>
+              <pre style={{ background: '#f7fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', marginTop: '12px' }}>
+{`AYUSH [CONDITION] PROTOCOL
+========================
+
+1. HERBAL MEDICINES:
+- [Herb Name] ([Botanical Name]) — [Dosage] [Frequency] with [Carrier e.g., warm water]
+- [Herb 2]...
+
+2. DIETARY GUIDELINES:
+- Recommended: [Foods to eat]
+- Avoid: [Foods to avoid]
+- Hydration: [Specific instructions]
+
+3. LIFESTYLE & YOGA:
+- Exercise: [Specific asanas or activities]
+- Routine: [Sleep cycle, stress management]
+
+4. FOLLOW-UP:
+- Review in [X] days
+- Required Tests: [If any]`}
+              </pre>
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', textAlign: 'right' }}>
+              <button onClick={() => setShowSampleLayout(false)} className="admin-btn-primary">Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Success Modal */}
+      {successModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1050] p-6">
+          <div className="bg-white rounded-xl w-full max-w-[400px] shadow-2xl overflow-hidden">
+            <div className="px-6 py-8 text-center flex flex-col items-center">
+              <CheckCircle size={56} color="var(--forest)" className="mb-4" />
+              <h3 className="m-0 mb-3 text-slate-800 text-xl font-bold">{successModal.title}</h3>
+              <p className="m-0 text-slate-600 text-[0.95rem] leading-relaxed">
+                {successModal.message}
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+              <button 
+                onClick={() => setSuccessModal({ show: false, title: '', message: '' })} 
+                className="admin-btn-primary w-full p-2.5"
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
