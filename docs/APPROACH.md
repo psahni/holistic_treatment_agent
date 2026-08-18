@@ -258,90 +258,71 @@ sequenceDiagram
     participant P as Patient (Browser)
     participant F as Next.js Frontend
     participant B as FastAPI Backend
-    participant G as Input Guardrails
     participant A as LangGraph Agent
     participant L as Gemini LLM
     participant K as Vector DB (Qdrant)
-    participant S as Session Store (Redis)
+    participant DB as PostgreSQL
+
+    Note over B: Input guardrails run on every request<br/>(emergency, scope, pediatric, pregnancy checks)
+    Note over B: Session state persisted to Redis on every turn
 
     P->>F: Fill patient info form (age, gender, region)
-    F->>B: POST /api/naturo/start {patient_info, message}
-    B->>G: run_input_guardrails(message, age)
-    G-->>B: {safe: true}
-    B->>S: Create session (UUID)
-    B->>A: agent.start_session(patient_info, session_id)
-    A->>L: intake_node → Gemini (generate first question)
-    L-->>A: "What is your chief complaint?"
-    A-->>B: AssessmentResponse {step: "intake", message: "..."}
-    B->>S: Save state
-    B-->>F: JSON response
-    F-->>P: Display AI question in chat bubble
+    F->>B: POST /api/naturo/start → creates session (UUID)
 
-    loop 8+ Questions (Intake Phase)
+    loop Intake Phase (8+ progressive questions)
+        B->>A: intake_node processes patient message
+        A->>L: Gemini generates follow-up question
+        L-->>A: Next question or mode recommendation
+        A-->>B: AssessmentResponse {step: "intake"}
+        B-->>F: JSON response
+        F-->>P: Display question in chat bubble
         P->>F: Type symptom response
         F->>B: POST /api/naturo/chat {session_id, message}
-        B->>G: run_input_guardrails(message)
-        B->>S: Load state
-        B->>A: agent.process_message(session_id, message, state)
-        A->>L: intake_node → Gemini (next question)
-        L-->>A: Follow-up question
-        A-->>B: Updated state
-        B->>S: Save state
-        B-->>F: {step: "intake", message: "...", is_complete: false}
-        F-->>P: Display follow-up question
     end
 
-    Note over A: 8+ data points collected → step = "root_cause"
+    Note over A: Sufficient data collected → Analysis Pipeline
 
-    A->>L: root_cause_node → Gemini (analyze all data)
-    L-->>A: Structured root causes [{cause, category, severity}]
-    A->>K: Semantic Search (RAG) for matching protocols
-    A->>L: protocol_selection_node → Gemini (match protocols)
-    L-->>A: Selected protocols [{type, name, duration, frequency}]
-    A->>L: recommendation_node → Gemini (generate 30-day plan)
-    L-->>A: Full report {daily_routine, diet, exercises, herbs, red_flags}
-    A->>A: guardrail_output_node (check safety, append disclaimer)
-    A-->>B: {step: "complete", is_complete: true, report: {...}}
-    B->>S: Save final state
-    
+    rect rgb(240, 248, 255)
+        Note over A,L: Analysis Pipeline (3 sequential LLM calls)
+        A->>L: root_cause_node → identify root causes
+        A->>K: RAG lookup for matching protocols
+        A->>L: protocol_selection_node → select protocols
+        A->>L: recommendation_node → generate 30-day plan
+        A->>A: guardrail_output_node → safety check + AYUSH disclaimer
+    end
+
     alt Question Mode
-        B-->>F: Full assessment response with report
-        F-->>P: Display instant remedies & advice
+        B-->>F: Instant remedies & advice
+        F-->>P: Display recommendations
     else Treatment Mode
         B->>DB: Save session as 'pending_review'
-        B-->>F: Assessment complete message
-        F-->>P: Display "Sent to practitioner for review"
+        F-->>P: "Sent to practitioner for review"
     end
-    
+
     %% --- Practitioner Review Flow ---
     participant AD as Admin (Practitioner)
-    participant DB as PostgreSQL
-    
+
     AD->>F: Log into Practitioner Console
     F->>B: GET /api/admin/pending-cases
-    B->>DB: Fetch 'pending_review' cases
-    B-->>F: Return list of cases
-    
-    AD->>F: Review patient case & intake data
-    
+    B->>DB: Fetch pending cases
+    B-->>F: Return case list
+
+    AD->>F: Review patient intake data
+
     opt Generate AI Prescription
-        AD->>F: Enter clinical prompt
-        F->>B: POST /generate-ai-prescription
-        B->>L: Gemini (Doctor Prompt + Patient Context)
-        L-->>B: Draft Prescription
-        B-->>F: Display in Editor
+        F->>B: POST /generate-ai-prescription {doctor_prompt}
+        B->>L: Gemini (prompt + patient context)
+        B-->>F: Draft prescription → Editor
     end
-    
+
     opt Save Draft
-        AD->>F: Click "Save Draft"
         F->>B: POST /api/admin/cases/{id}/draft
-        B->>DB: Update 'doctor_prescription'
+        B->>DB: Persist draft prescription
     end
-    
+
     AD->>F: Preview & Submit
     F->>B: POST /api/admin/cases/{id}/approve
-    B->>DB: Mark status='reviewed', save final prescription
-    B-->>F: Success Modal
+    B->>DB: Mark status='reviewed'
     Note over B,P: System emails final prescription to Patient
 ```
 
