@@ -89,6 +89,14 @@ The Naturopathy Agent operates in a Dual-Mode system to cater to different user 
    - **Purpose**: A complete, holistic profile collection procedure gathering data on lifestyle, food habits, sleep cycle, and more.
    - **Flow**: The agent performs the full 8-point intake process progressively before passing the state to the analysis nodes (`root_cause_node`, `protocol_selection_node`, `recommendation_node`). Designed for users wanting a personalized 30-day Naturopathy protocol. Responses are persisted for future reference.
 
+### Mode Switch Detection Mechanism
+
+The system automatically detects when a user in Question Mode needs to be escalated to Full Treatment Mode using a two-part tag parsing mechanism:
+
+1. **The Prompt Logic (`backend/naturopathy/prompts.py`)**: The `QUESTION_MODE_PROMPT` instructs Gemini to evaluate the severity and chronicity of the user's issue (e.g., severe liver disease, autoimmune conditions). If detected, the LLM is instructed to append a hidden routing tag `[MODE: treatment]` to the very end of its response.
+2. **The Code Parser (`backend/naturopathy/nodes.py`)**: Inside the `intake_node`, the Python code scans the raw string returned by Gemini. If it detects the `[MODE: treatment]` tag, it strips the tag out so it is invisible to the user, and updates the `recommended_mode` state variable.
+3. **The Frontend Trigger (`frontend/src/components/ChatInterface.jsx`)**: The `recommended_mode` flag is returned via the FastAPI JSON payload. When the Next.js frontend detects `recommended_mode === 'treatment'`, it automatically renders a UI alert/button prompting the patient to switch to Full Treatment Mode.
+
 ---
 
 ## Approach: Why We Built It This Way
