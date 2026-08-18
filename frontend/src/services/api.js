@@ -145,9 +145,10 @@ export const naturopathyAPI = {
   },
 
   // Practitioner Endpoints
-  getPendingCases: async () => {
+  getPendingCases: async (options = {}) => {
     return fetchWithCredentials(`${API_BASE}/api/admin/pending-cases`, {
-      method: 'GET'
+      method: 'GET',
+      ...options
     });
   },
 
@@ -185,9 +186,10 @@ export const naturopathyAPI = {
 
 
   // Prescription Template Endpoints
-  getTemplates: async () => {
+  getTemplates: async (options = {}) => {
     return fetchWithCredentials(`${API_BASE}/api/admin/templates`, {
-      method: 'GET'
+      method: 'GET',
+      ...options
     });
   },
 

@@ -46,21 +46,29 @@ export default function AdminDashboard({ onLogout }) {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     if (activeTab === 'practitioner') {
-      fetchPendingCases();
-      fetchTemplates();
+      fetchPendingCases({ signal });
+      fetchTemplates({ signal });
     } else if (activeTab === 'templates') {
-      fetchTemplates();
+      fetchTemplates({ signal });
     }
+
+    return () => {
+      controller.abort();
+    };
   }, [activeTab]);
 
   // ─── Template APIs ─────────────────────────────────
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (options = {}) => {
     setLoadingTemplates(true);
     try {
-      const res = await naturopathyAPI.getTemplates();
+      const res = await naturopathyAPI.getTemplates(options);
       setTemplates(Array.isArray(res) ? res : []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch templates:", err);
     } finally {
       setLoadingTemplates(false);
@@ -182,12 +190,13 @@ export default function AdminDashboard({ onLogout }) {
   };
 
   // ─── Practitioner Console ─────────────────────────
-  const fetchPendingCases = async () => {
+  const fetchPendingCases = async (options = {}) => {
     setLoadingCases(true);
     try {
-      const res = await naturopathyAPI.getPendingCases();
+      const res = await naturopathyAPI.getPendingCases(options);
       setPendingCases(res.cases || []);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch pending cases:", err);
     } finally {
       setLoadingCases(false);
@@ -1141,20 +1150,19 @@ export default function AdminDashboard({ onLogout }) {
       
       {/* Success Modal */}
       {successModal.show && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050, padding: '24px' }}>
-          <div style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '400px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-            <div style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CheckCircle size={56} color="var(--forest)" style={{ marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 12px 0', color: '#2d3748', fontSize: '1.25rem' }}>{successModal.title}</h3>
-              <p style={{ margin: 0, color: '#4a5568', fontSize: '0.95rem', lineHeight: '1.5' }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1050] p-6">
+          <div className="bg-white rounded-xl w-full max-w-[400px] shadow-2xl overflow-hidden">
+            <div className="px-6 py-8 text-center flex flex-col items-center">
+              <CheckCircle size={56} color="var(--forest)" className="mb-4" />
+              <h3 className="m-0 mb-3 text-slate-800 text-xl font-bold">{successModal.title}</h3>
+              <p className="m-0 text-slate-600 text-[0.95rem] leading-relaxed">
                 {successModal.message}
               </p>
             </div>
-            <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center' }}>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-center">
               <button 
                 onClick={() => setSuccessModal({ show: false, title: '', message: '' })} 
-                className="admin-btn-primary" 
-                style={{ width: '100%', padding: '10px' }}
+                className="admin-btn-primary w-full p-2.5"
               >
                 Okay
               </button>
