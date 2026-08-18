@@ -295,8 +295,46 @@ sequenceDiagram
     A->>A: guardrail_output_node (check safety, append disclaimer)
     A-->>B: {step: "complete", is_complete: true, report: {...}}
     B->>S: Save final state
-    B-->>F: Full assessment response with report
-    F-->>P: Display RecommendationCard with 30-day protocol
+    
+    alt Question Mode
+        B-->>F: Full assessment response with report
+        F-->>P: Display instant remedies & advice
+    else Treatment Mode
+        B->>DB: Save session as 'pending_review'
+        B-->>F: Assessment complete message
+        F-->>P: Display "Sent to practitioner for review"
+    end
+    
+    %% --- Practitioner Review Flow ---
+    participant AD as Admin (Practitioner)
+    participant DB as PostgreSQL
+    
+    AD->>F: Log into Practitioner Console
+    F->>B: GET /api/admin/pending-cases
+    B->>DB: Fetch 'pending_review' cases
+    B-->>F: Return list of cases
+    
+    AD->>F: Review patient case & intake data
+    
+    opt Generate AI Prescription
+        AD->>F: Enter clinical prompt
+        F->>B: POST /generate-ai-prescription
+        B->>L: Gemini (Doctor Prompt + Patient Context)
+        L-->>B: Draft Prescription
+        B-->>F: Display in Editor
+    end
+    
+    opt Save Draft
+        AD->>F: Click "Save Draft"
+        F->>B: POST /api/admin/cases/{id}/draft
+        B->>DB: Update 'doctor_prescription'
+    end
+    
+    AD->>F: Preview & Submit
+    F->>B: POST /api/admin/cases/{id}/approve
+    B->>DB: Mark status='reviewed', save final prescription
+    B-->>F: Success Modal
+    Note over B,P: System emails final prescription to Patient
 ```
 
 ---
@@ -379,7 +417,7 @@ holistic-treatment-agent/
 - [ ] Homeopathy module: Repertorization, constitutional remedy, materia medica lookup
 - [ ] ChromaDB/Weaviate for RAG on classical texts (Charaka Samhita, Kent's Repertory)
 - [ ] System classifier: Auto-route patients to the right AYUSH system
-- [ ] Practitioner dashboard with AI case summaries
+- [x] Practitioner dashboard with AI case summaries, draft saving, and AI prescription generation
 - [ ] Full eval suite expansion (200 labelled cases)
 
 ### Phase 3 — Production (PLANNED)
