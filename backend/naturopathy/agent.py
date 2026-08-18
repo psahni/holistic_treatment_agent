@@ -112,3 +112,5 @@ class NaturopathyAgent:
         except Exception as e:
             logger.error(f"process_message_stream error: {e}", exc_info=True)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+naturopathy_agent_instance = NaturopathyAgent()

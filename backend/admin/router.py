@@ -456,8 +456,7 @@ async def generate_ai_prescription(session_id: str, req: GenerateAIPrescriptionR
     if not any(k in lower_prompt for k in clinical_keywords):
         raise HTTPException(status_code=400, detail="Prompt does not appear to be clinically relevant. Please provide specific instructions for the prescription.")
 
-    from naturopathy.agent import NaturopathyAgent
-    agent = NaturopathyAgent()
+    from naturopathy.agent import naturopathy_agent_instance as agent
     from memory.session_store import session_store
     import uuid
     
