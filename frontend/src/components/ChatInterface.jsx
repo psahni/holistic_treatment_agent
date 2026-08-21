@@ -46,6 +46,7 @@ export default function ChatInterface({ sessionId, user }) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formStep, setFormStep] = useState(1);
+  const [useStreaming, setUseStreaming] = useState(true);
   
   const endOfMessagesRef = useRef(null);
 
@@ -218,63 +219,81 @@ export default function ChatInterface({ sessionId, user }) {
     let assistantMessageAdded = false;
     
     try {
-      const stream = naturopathyAPI.streamMessage(activeSessionId, userMessage, mode);
-      
-      for await (const data of stream) {
-        if (data.chunk) {
-          if (!assistantMessageAdded) {
-             setIsTyping(false);
-             assistantMessageAdded = true;
-             setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-          }
-          
-          // Smooth the typing effect by appending character by character with a tiny delay
-          const chars = data.chunk.split('');
-          for (let i = 0; i < chars.length; i++) {
-             await new Promise(r => setTimeout(r, 8)); // 8ms per char
-             setMessages(prev => {
-               const newMessages = [...prev];
-               const lastMsg = { ...newMessages[newMessages.length - 1] };
-               lastMsg.content += chars[i];
-               newMessages[newMessages.length - 1] = lastMsg;
-               return newMessages;
-             });
+      if (!useStreaming) {
+        const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
+        setIsTyping(false);
+        setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
+        
+        if (reply.step) setStep(reply.step);
+        if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
+        if (reply.need_practitioner) setNeedsPractitioner(true);
+        if (reply.recommended_mode === "treatment") {
+          setSuggestedModeSwitch(true);
+          sessionStorage.setItem("pending_mode_switch", "treatment");
+        }
+        if (reply.is_complete || reply.assessment_complete) {
+          setIsComplete(true);
+          if (reply.report) setReport(reply.report);
+          if (mode === 'treatment') {
+            setTimeout(checkCaseReviewStatus, 1500);
           }
         }
+      } else {
+        const stream = naturopathyAPI.streamMessage(activeSessionId, userMessage, mode);
         
-        if (data.done && data.state) {
-          const response = data.state;
-          // Replace final text in case of disclaimers/mode stripping
-          if (response.message) {
+        for await (const data of stream) {
+          if (data.chunk) {
             if (!assistantMessageAdded) {
-                setMessages(prev => [...prev, { role: 'assistant', content: response.message }]);
-                assistantMessageAdded = true;
-                setIsTyping(false);
-            } else {
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMsg = { ...newMessages[newMessages.length - 1] };
-                  lastMsg.content = response.message;
-                  newMessages[newMessages.length - 1] = lastMsg;
-                  return newMessages;
-                });
+               setIsTyping(false);
+               assistantMessageAdded = true;
+               setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+            }
+            
+            const chars = data.chunk.split('');
+            for (let i = 0; i < chars.length; i++) {
+               await new Promise(r => setTimeout(r, 8)); // 8ms per char
+               setMessages(prev => {
+                 const newMessages = [...prev];
+                 const lastMsg = { ...newMessages[newMessages.length - 1] };
+                 lastMsg.content += chars[i];
+                 newMessages[newMessages.length - 1] = lastMsg;
+                 return newMessages;
+               });
             }
           }
-          if (response.step) setStep(response.step);
-          if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
-          if (response.need_practitioner) setNeedsPractitioner(true);
           
-          console.log("RECOMMENDED MODE:", response.recommended_mode);
-          if (response.recommended_mode === "treatment") {
-            setSuggestedModeSwitch(true);
-            sessionStorage.setItem("pending_mode_switch", "treatment");
-          }
-          
-          if (response.is_complete || response.assessment_complete) {
-            setIsComplete(true);
-            if (response.report) setReport(response.report);
-            if (mode === 'treatment') {
-              setTimeout(checkCaseReviewStatus, 1500);
+          if (data.done && data.state) {
+            const response = data.state;
+            if (response.message || response.reply) {
+              if (!assistantMessageAdded) {
+                  setMessages(prev => [...prev, { role: 'assistant', content: response.message || response.reply }]);
+                  assistantMessageAdded = true;
+                  setIsTyping(false);
+              } else {
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = { ...newMessages[newMessages.length - 1] };
+                    lastMsg.content = response.message || response.reply;
+                    newMessages[newMessages.length - 1] = lastMsg;
+                    return newMessages;
+                  });
+              }
+            }
+            if (response.step) setStep(response.step);
+            if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
+            if (response.need_practitioner) setNeedsPractitioner(true);
+            
+            if (response.recommended_mode === "treatment") {
+              setSuggestedModeSwitch(true);
+              sessionStorage.setItem("pending_mode_switch", "treatment");
+            }
+            
+            if (response.is_complete || response.assessment_complete) {
+              setIsComplete(true);
+              if (response.report) setReport(response.report);
+              if (mode === 'treatment') {
+                setTimeout(checkCaseReviewStatus, 1500);
+              }
             }
           }
         }
@@ -783,6 +802,17 @@ export default function ChatInterface({ sessionId, user }) {
         {!(mode === 'treatment' && !isComplete) && (
           <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={useStreaming} 
+                    onChange={e => setUseStreaming(e.target.checked)} 
+                    style={{ accentColor: 'var(--primary-green)', cursor: 'pointer' }} 
+                  />
+                  Enable Streaming Response
+                </label>
+              </div>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',

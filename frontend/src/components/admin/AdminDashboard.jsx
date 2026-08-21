@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Clock, User, FileText, Send, Plus, Edit3, Sparkles, BookOpen, X, Save, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { naturopathyAPI } from '../../services/api';
+import { naturopathyAPI, API_BASE } from '../../services/api';
 
 export default function AdminDashboard({ onLogout }) {
   const [docs, setDocs] = useState([]);
@@ -246,7 +246,7 @@ export default function AdminDashboard({ onLogout }) {
   // ─── RAG Document Management (unchanged) ──────────
   const fetchDocs = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/admin/docs', { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/api/admin/docs`, { credentials: 'include' });
       const data = await res.json();
       if (res.ok) {
         setDocs(data.docs || []);
@@ -258,7 +258,7 @@ export default function AdminDashboard({ onLogout }) {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:8080/api/admin/logout', { method: 'POST', credentials: 'include' });
+      await fetch(`${API_BASE}/api/admin/logout`, { method: 'POST', credentials: 'include' });
       onLogout();
     } catch (err) {
       console.error(err);
@@ -278,7 +278,7 @@ export default function AdminDashboard({ onLogout }) {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8080/api/admin/upload', {
+      const res = await fetch(`${API_BASE}/api/admin/upload`, {
         method: 'POST',
         body: formData,
         credentials: 'include'
@@ -302,7 +302,7 @@ export default function AdminDashboard({ onLogout }) {
     if (!confirm(`Are you sure you want to delete ${filename}? This will remove it from the database.`)) return;
     
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/docs/${filename}`, {
+      const res = await fetch(`${API_BASE}/api/admin/docs/${filename}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -319,7 +319,7 @@ export default function AdminDashboard({ onLogout }) {
   const handleIngest = (filename) => {
     setIngestionState({ filename, progress: 0, message: 'Connecting...', status: 'starting' });
     
-    const eventSource = new EventSource(`http://localhost:8080/api/admin/ingest/${filename}?t=${Date.now()}`, {
+    const eventSource = new EventSource(`${API_BASE}/api/admin/ingest/${filename}?t=${Date.now()}`, {
       withCredentials: true
     });
 
@@ -350,7 +350,7 @@ export default function AdminDashboard({ onLogout }) {
     setChunksOpen(false);
     
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/embeddings/search-with-answer?q=${encodeURIComponent(searchQuery)}`, {
+      const res = await fetch(`${API_BASE}/api/admin/embeddings/search-with-answer?q=${encodeURIComponent(searchQuery)}`, {
         credentials: 'include'
       });
       const data = await res.json();

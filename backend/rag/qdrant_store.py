@@ -111,7 +111,7 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
     Note: gemini-embedding-001 is Gemini API-only — not available on Vertex AI.
     Backoff schedule: 5s, 10s, 20s, 40s, 80s (exponential x5).
     """
-    max_retries = 5
+    max_retries = 8
     for attempt in range(max_retries):
         try:
             eclient = get_embedding_client()
@@ -119,11 +119,12 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
                 model="models/gemini-embedding-001",
                 contents=texts
             )
-            time.sleep(1.0)  # Rate-limit throttle for batches
+            time.sleep(4.5)  # Rate-limit throttle for batches (15 RPM = 4s per request)
             return [e.values for e in res.embeddings]
         except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                wait_time = (2 ** attempt) * 5  # 5s, 10s, 20s, 40s, 80s
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                wait_time = min(300, (2 ** attempt) * 10)  # 10s, 20s, 40s, 80s, 160s, 300s
                 logger.warning(f"Gemini embedding rate-limited. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})...")
                 time.sleep(wait_time)
             else:

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Lock, User } from 'lucide-react';
 
+import { API_BASE } from '@/services/api';
+
 export default function AdminLogin({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +15,7 @@ export default function AdminLogin({ onLoginSuccess }) {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8080/api/admin/login', {
+      const response = await fetch(`${API_BASE}/api/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

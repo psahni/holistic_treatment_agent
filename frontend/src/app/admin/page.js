@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import './admin.css';
 import AdminLogin from '@/components/admin/AdminLogin';
 import AdminDashboard from '@/components/admin/AdminDashboard';
-import { api } from '@/services/api';
+import { api, API_BASE } from '@/services/api';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -12,7 +12,7 @@ export default function AdminPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/admin/check-auth', {
+        const response = await fetch(`${API_BASE}/api/admin/check-auth`, {
           credentials: 'include'
         });
         if (response.ok) {
