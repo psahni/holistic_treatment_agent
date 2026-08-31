@@ -220,10 +220,10 @@ def root_cause_node(state: NaturopathyState) -> NaturopathyState:
         state["error"] = f"Failed to parse root causes: {str(e)}"
         state["root_causes"] = []
 
-    state["step"] = "treatment_design"
+    state["step"] = "medical_triage"
     return state
 
-def treatment_design_node(state: NaturopathyState) -> NaturopathyState:
+def medical_triage_node(state: NaturopathyState) -> NaturopathyState:
     llm = get_llm()
     root_causes = state.get("root_causes", [])
     

@@ -8,25 +8,33 @@ A full-stack **Holistic Health Triage Agent** with a Naturopathy-focused AI back
 
 ## 🐍 Backend (FastAPI + LangGraph)
 
-### Agent Pipeline (5-Node LangGraph Graph)
+### Agent Pipeline (6-Node LangGraph Graph)
 
 ```mermaid
-flowchart LR
-    A["🏥 Intake Node"] --> B["🔍 Root Cause Node"]
-    B --> C["📋 Protocol Selection Node"]
-    C --> D["🌿 Recommendation Node"]
-    D --> E["🛡️ Guardrail Output Node"]
+flowchart TD
+    Start([Start]) --> Q["🔍 RAG Query Node<br/>(qdrant_query)"]
+    Q --> I["🏥 Intake Node<br/>(intake)"]
     
-    A -->|"Emergency?"| E
+    I -->|"Mode: question"| END([END])
+    I -->|"Mode: treatment & responses < 8"| END
+    I -->|"Mode: treatment & responses >= 8"| RC["🔍 Root Cause Node<br/>(root_cause)"]
+    
+    RC --> TD["📋 Medical Triage Node<br/>(medical_triage)"]
+    TD --> R["🌿 Recommendation Node<br/>(recommendation)"]
+    R --> G["🛡️ Guardrail Output Node<br/>(guardrail)"]
+    G --> END
+    
+    I -.->|"Emergency detected?<br/>(Graph bug: unreachable)"| G
 ```
 
 | Node | Purpose |
 |------|---------|
-| **intake_node** | Progressive 8+ question interview (chief complaint, diet, sleep, stress, exercise, etc.) via Gemini |
-| **root_cause_node** | Analyzes all patient data → structured root causes categorized by Dietary / Lifestyle / Emotional / Environmental / Structural |
-| **protocol_selection_node** | Matches root causes against Nature Cure protocols via RAG (Qdrant) + Gemini |
-| **recommendation_node** | Generates structured 30-day report (daily routine, diet, exercises, herbs, red flags) |
-| **guardrail_output_node** | Safety checks, allopathic drug blocking, AYUSH disclaimer injection, practitioner routing (>3 severe causes) |
+| **qdrant_query** | Entry point; retrieves hybrid context from Qdrant based on the latest user message. |
+| **intake** | Conducts progressive interview (chief complaint, diet, sleep, etc.) via Gemini. Supports Question Mode (instant triage and exit) and Treatment Mode (asks questions until 8 data points, then triggers root cause analysis). |
+| **root_cause** | Analyzes user responses to identify root causes categorized by Dietary / Lifestyle / Emotional / Environmental / Structural. |
+| **medical_triage** | Validates the root causes against reference sources (via internal RAG lookup) and prepares routing parameters (practitioner referral, emergency status checks). |
+| **recommendation** | Synthesizes root causes and protocols into a structured 30-day report. |
+| **guardrail** | Applies safety checks, emergency keyword blocking, AYUSH disclaimers, and flags complex cases for practitioner routing. |
 
 ---
 

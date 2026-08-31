@@ -1,0 +1,465 @@
+{
+  "disclaimer": "This information is for educational purposes only and does not substitute professional medical advice. Herb-drug interactions can be unpredictable and vary based on individual metabolism, dosage, and specific drug formulations. Always consult a healthcare provider or qualified clinical herbalist before combining herbs with pharmaceutical medications.",
+  "interactions": [
+    {
+      "herb": "Ashwagandha",
+      "common_names": ["Withania somnifera", "Indian Ginseng"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Sedatives / CNS Depressants",
+          "examples": ["Benzodiazepines", "Barbiturates", "Zolpidem"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Ashwagandha has sedative properties that may have additive effects when combined with CNS depressants, leading to excessive drowsiness.",
+          "recommendation": "Use with caution; monitor for excessive sedation."
+        },
+        {
+          "drug_class": "Thyroid Medications",
+          "examples": ["Levothyroxine"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "May increase thyroid hormone synthesis and secretion, potentially leading to hyperthyroid symptoms if taking thyroid replacement.",
+          "recommendation": "Monitor thyroid function tests closely; dosage adjustment of the medication may be needed."
+        },
+        {
+          "drug_class": "Immunosuppressants",
+          "examples": ["Cyclosporine", "Corticosteroids", "Tacrolimus"],
+          "interaction_type": "antagonize",
+          "severity": "moderate",
+          "mechanism": "Ashwagandha is an immunostimulant and may counteract the effects of medications intended to suppress the immune system.",
+          "recommendation": "Avoid use in patients on immunosuppressive therapy."
+        }
+      ],
+      "safe_with": ["Most vitamins", "Adaptogens like Rhodiola"],
+      "general_cautions": "Avoid during pregnancy. Use cautiously in hyperthyroidism."
+    },
+    {
+      "herb": "Turmeric",
+      "common_names": ["Curcuma longa", "Curcumin"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Anticoagulants / Antiplatelets",
+          "examples": ["Warfarin", "Clopidogrel", "Aspirin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Curcumin inhibits platelet aggregation, increasing the risk of bleeding when combined with blood thinners.",
+          "recommendation": "Avoid therapeutic doses of curcumin. Dietary culinary amounts are generally safe. Stop use 2 weeks prior to surgery."
+        },
+        {
+          "drug_class": "Antidiabetic Medications",
+          "examples": ["Metformin", "Insulin", "Sulfonylureas"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "Turmeric may lower blood sugar levels, increasing the risk of hypoglycemia when combined with diabetes drugs.",
+          "recommendation": "Monitor blood glucose levels; medication adjustments may be required."
+        }
+      ],
+      "safe_with": ["Black pepper (increases absorption)", "Ginger"],
+      "general_cautions": "Caution in patients with gallstones or bile duct obstruction."
+    },
+    {
+      "herb": "Ginger",
+      "common_names": ["Zingiber officinale"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Anticoagulants / Antiplatelets",
+          "examples": ["Warfarin", "Heparin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Inhibits platelet aggregation. High doses (>4g/day) may increase bleeding risk.",
+          "recommendation": "Monitor INR if taking Warfarin. Keep doses moderate (<2g/day)."
+        },
+        {
+          "drug_class": "Antidiabetic Medications",
+          "examples": ["Glipizide", "Insulin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May enhance insulin release and lower blood glucose.",
+          "recommendation": "Monitor blood sugar levels."
+        }
+      ],
+      "safe_with": ["Most culinary herbs", "Anti-nausea medications (often synergistic)"],
+      "general_cautions": "May exacerbate heartburn in sensitive individuals at high doses."
+    },
+    {
+      "herb": "Garlic",
+      "common_names": ["Allium sativum"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Anticoagulants",
+          "examples": ["Warfarin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Decreases platelet aggregation and may have fibrinolytic activity.",
+          "recommendation": "Avoid high-dose garlic supplements if on blood thinners. Stop 10 days before surgery."
+        },
+        {
+          "drug_class": "Protease Inhibitors (HIV)",
+          "examples": ["Saquinavir"],
+          "interaction_type": "decrease",
+          "severity": "severe",
+          "mechanism": "Garlic induces CYP450 3A4, reducing the blood levels and efficacy of some protease inhibitors.",
+          "recommendation": "Strictly avoid garlic supplements."
+        }
+      ],
+      "safe_with": ["Culinary use is generally safe with most drugs except severe bleeding risks."],
+      "general_cautions": "Can cause GI upset."
+    },
+    {
+      "herb": "Neem",
+      "common_names": ["Azadirachta indica"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetic Medications",
+          "examples": ["Metformin", "Insulin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Neem has potent hypoglycemic effects.",
+          "recommendation": "Monitor blood glucose closely; high risk of hypoglycemia."
+        },
+        {
+          "drug_class": "Immunosuppressants",
+          "examples": ["Cyclosporine", "Prednisone"],
+          "interaction_type": "antagonize",
+          "severity": "moderate",
+          "mechanism": "Neem stimulates the immune system.",
+          "recommendation": "Avoid combination."
+        }
+      ],
+      "safe_with": ["Turmeric for skin conditions"],
+      "general_cautions": "Strictly avoid in pregnancy and those trying to conceive (has contraceptive properties). Avoid in children (risk of Reye's-like syndrome)."
+    },
+    {
+      "herb": "Tulsi",
+      "common_names": ["Ocimum sanctum", "Holy Basil"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Anticoagulants",
+          "examples": ["Aspirin", "Warfarin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May slow blood clotting.",
+          "recommendation": "Use cautiously if taking blood thinners."
+        }
+      ],
+      "safe_with": ["Most general medications"],
+      "general_cautions": "Generally considered very safe."
+    },
+    {
+      "herb": "Triphala",
+      "common_names": ["Combination of Amla, Haritaki, Bibhitaki"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Other Laxatives",
+          "examples": ["Senna", "Bisacodyl"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Additive laxative effect leading to diarrhea and electrolyte imbalance.",
+          "recommendation": "Avoid combining with stimulant laxatives."
+        }
+      ],
+      "safe_with": ["Most foods", "Probiotics"],
+      "general_cautions": "Use caution in pregnancy due to mild downward-moving (apana) effect."
+    },
+    {
+      "herb": "Amla",
+      "common_names": ["Phyllanthus emblica", "Indian Gooseberry"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetic Medications",
+          "examples": ["Metformin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May lower blood glucose.",
+          "recommendation": "Monitor blood sugar."
+        }
+      ],
+      "safe_with": ["Iron supplements (enhances iron absorption due to Vitamin C)"],
+      "general_cautions": "Very safe, rich in Vitamin C."
+    },
+    {
+      "herb": "Moringa",
+      "common_names": ["Moringa oleifera", "Drumstick tree"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antihypertensives",
+          "examples": ["Lisinopril", "Amlodipine"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "Moringa can lower blood pressure.",
+          "recommendation": "Monitor blood pressure for hypotension."
+        },
+        {
+          "drug_class": "Levothyroxine",
+          "examples": ["Synthroid"],
+          "interaction_type": "decrease",
+          "severity": "moderate",
+          "mechanism": "May decrease absorption if taken at the same time.",
+          "recommendation": "Separate dosage by at least 4 hours."
+        }
+      ],
+      "safe_with": ["Most nutritional supplements"],
+      "general_cautions": "Avoid consuming Moringa root or its extracts during pregnancy (may cause uterine contractions)."
+    },
+    {
+      "herb": "Brahmi",
+      "common_names": ["Bacopa monnieri"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Acetylcholinesterase Inhibitors",
+          "examples": ["Donepezil"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Brahmi increases acetylcholine levels; additive effect with Alzheimer's drugs.",
+          "recommendation": "Use cautiously; may increase risk of cholinergic side effects."
+        },
+        {
+          "drug_class": "Thyroid Medications",
+          "examples": ["Levothyroxine"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "Brahmi may stimulate thyroid hormone production.",
+          "recommendation": "Monitor thyroid levels."
+        }
+      ],
+      "safe_with": ["Ginkgo Biloba (often synergistic)"],
+      "general_cautions": "May cause stomach upset; best taken with food."
+    },
+    {
+      "herb": "Shatavari",
+      "common_names": ["Asparagus racemosus"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Diuretics",
+          "examples": ["Furosemide", "HCTZ"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "Shatavari has mild diuretic properties.",
+          "recommendation": "Monitor fluid and electrolyte balance."
+        }
+      ],
+      "safe_with": ["Ashwagandha", "Milk"],
+      "general_cautions": "Phytoestrogenic; use caution in estrogen-receptor-positive cancers."
+    },
+    {
+      "herb": "Guduchi",
+      "common_names": ["Tinospora cordifolia", "Giloy"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Immunosuppressants",
+          "examples": ["Cyclosporine"],
+          "interaction_type": "antagonize",
+          "severity": "moderate",
+          "mechanism": "Strong immunomodulator/immunostimulant.",
+          "recommendation": "Avoid in patients on immunosuppressants or with autoimmune diseases."
+        },
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Metformin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Significantly lowers blood sugar.",
+          "recommendation": "Monitor blood glucose carefully."
+        }
+      ],
+      "safe_with": ["Tulsi", "Amla"],
+      "general_cautions": "Avoid during pregnancy."
+    },
+    {
+      "herb": "Punarnava",
+      "common_names": ["Boerhavia diffusa"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Diuretics",
+          "examples": ["Spironolactone", "Lasix"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Punarnava is a potent natural diuretic.",
+          "recommendation": "Avoid combination to prevent dehydration and hypokalemia."
+        }
+      ],
+      "safe_with": ["Gokshura"],
+      "general_cautions": "Monitor kidney function and electrolytes if used long-term."
+    },
+    {
+      "herb": "Kutki",
+      "common_names": ["Picrorhiza kurroa"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Immunosuppressants",
+          "examples": ["Prednisone"],
+          "interaction_type": "antagonize",
+          "severity": "mild",
+          "mechanism": "May stimulate the immune system.",
+          "recommendation": "Use with caution."
+        }
+      ],
+      "safe_with": ["Milk Thistle", "Bhumyamalaki"],
+      "general_cautions": "Can cause diarrhea at high doses. Best used under practitioner guidance."
+    },
+    {
+      "herb": "Bhumyamalaki",
+      "common_names": ["Phyllanthus niruri", "Chanca Piedra"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Insulin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May lower blood sugar levels.",
+          "recommendation": "Monitor glucose levels."
+        },
+        {
+          "drug_class": "Diuretics",
+          "examples": ["HCTZ"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Has diuretic properties and may increase lithium levels by reducing excretion.",
+          "recommendation": "Use cautiously."
+        }
+      ],
+      "safe_with": ["Liver supportive herbs"],
+      "general_cautions": "Safe for short to medium term use."
+    },
+    {
+      "herb": "Haritaki",
+      "common_names": ["Terminalia chebula"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Metformin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May decrease blood sugar.",
+          "recommendation": "Monitor blood glucose."
+        }
+      ],
+      "safe_with": ["Other Triphala components"],
+      "general_cautions": "Avoid in pregnancy. High doses act as a strong purgative."
+    },
+    {
+      "herb": "Bibhitaki",
+      "common_names": ["Terminalia bellirica"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Metformin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "May lower blood sugar.",
+          "recommendation": "Monitor blood glucose."
+        }
+      ],
+      "safe_with": ["Haritaki", "Amla"],
+      "general_cautions": "Generally safe."
+    },
+    {
+      "herb": "Arjuna",
+      "common_names": ["Terminalia arjuna"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antihypertensives",
+          "examples": ["Beta-blockers", "ACE inhibitors"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Arjuna lowers blood pressure and improves heart function, which may lead to hypotension if combined with BP meds.",
+          "recommendation": "Monitor BP closely; medication dose may need reduction."
+        },
+        {
+          "drug_class": "Cardiac Glycosides",
+          "examples": ["Digoxin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Inotropic effect of Arjuna may add to the effect of Digoxin.",
+          "recommendation": "Use under strict medical supervision."
+        }
+      ],
+      "safe_with": ["Ashwagandha"],
+      "general_cautions": "Cardio-active herb; must be used with caution in complex heart diseases."
+    },
+    {
+      "herb": "Fenugreek",
+      "common_names": ["Trigonella foenum-graecum", "Methi"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Glimepiride", "Insulin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "High fiber and specific compounds significantly lower blood sugar.",
+          "recommendation": "Monitor blood sugar closely; frequent dosage adjustments of diabetes drugs are needed."
+        },
+        {
+          "drug_class": "Anticoagulants",
+          "examples": ["Warfarin"],
+          "interaction_type": "increase",
+          "severity": "mild",
+          "mechanism": "Contains coumarin derivatives.",
+          "recommendation": "Use normal culinary amounts; avoid high-dose supplements if on blood thinners."
+        }
+      ],
+      "safe_with": ["Most culinary herbs"],
+      "general_cautions": "Avoid high doses during early pregnancy (may stimulate contractions)."
+    },
+    {
+      "herb": "Cinnamon",
+      "common_names": ["Cinnamomum cassia", "Cinnamomum zeylanicum"],
+      "drugs_that_interact": [
+        {
+          "drug_class": "Antidiabetics",
+          "examples": ["Metformin"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Increases insulin sensitivity and lowers blood sugar.",
+          "recommendation": "Monitor blood glucose."
+        },
+        {
+          "drug_class": "Hepatotoxic Drugs",
+          "examples": ["Acetaminophen", "Statins"],
+          "interaction_type": "increase",
+          "severity": "moderate",
+          "mechanism": "Cassia cinnamon contains coumarin, which in large amounts can stress the liver.",
+          "recommendation": "Use Ceylon cinnamon instead of Cassia if consuming daily, or limit Cassia intake."
+        }
+      ],
+      "safe_with": ["Cardamom", "Clove"],
+      "general_cautions": "Cassia cinnamon should be limited due to coumarin content."
+    }
+  ],
+  "herbs_to_avoid_in_pregnancy": [
+    "Neem (abortifacient/contraceptive)",
+    "Aloe Vera (purgative, may cause contractions)",
+    "Fenugreek (in therapeutic doses)",
+    "Guduchi",
+    "Haritaki (purgative)",
+    "Ashwagandha (large doses)",
+    "Moringa root"
+  ],
+  "herbs_to_avoid_in_pediatric": [
+    "Neem oil (risk of Reye's-like syndrome)",
+    "Strong laxatives like Senna or large doses of Triphala",
+    "Ashwagandha (unless prescribed by practitioner for specific conditions)"
+  ],
+  "safe_herbs_overview": [
+    {
+      "herb": "Tulsi",
+      "safety_rating": "High",
+      "notes": "Safe for daily use as tea for most people."
+    },
+    {
+      "herb": "Amla",
+      "safety_rating": "High",
+      "notes": "Excellent daily tonic, very high safety profile."
+    },
+    {
+      "herb": "Ginger",
+      "safety_rating": "High",
+      "notes": "Culinary amounts are universally safe. Therapeutic doses need caution only with blood thinners."
+    },
+    {
+      "herb": "Turmeric",
+      "safety_rating": "High",
+      "notes": "Safe in cooking; extracts/supplements require caution with blood thinners."
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 const steps = [
   { id: 'intake', label: 'Health Intake', icon: '📋', description: 'Tell us about your symptoms' },
   { id: 'root_cause', label: 'Root Cause Analysis', icon: '🔍', description: 'Identifying root causes' },
-  { id: 'treatment_design', label: 'Protocol Design', icon: '📜', description: 'Selecting natural therapies' },
+  { id: 'medical_triage', label: 'Medical Triage', icon: '🛡️', description: 'Validating safety and protocols' },
   { id: 'recommendation', label: 'Your Protocol', icon: '🌿', description: 'Your personalized plan' },
 ];
 
