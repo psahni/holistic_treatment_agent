@@ -333,17 +333,126 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--cream)', flexDirection: 'row' }}>
-      {/* Sidebar - Desktop */}
-      <div style={{ width: '300px', borderRight: '1px solid var(--cream-dark)', padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-        <h2 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Leaf color="var(--forest)" /> NatureCure
-        </h2>
-        <AssessmentProgress currentStep={step} />
-      </div>
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--cream)', flexDirection: 'column' }}>
+      {/* Sleek Top Navigation Bar */}
+      <header style={{
+        height: '60px',
+        borderBottom: '1px solid var(--cream-dark)',
+        background: 'rgba(255, 255, 255, 0.92)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 2rem',
+        flexShrink: 0,
+        zIndex: 10
+      }}>
+        {/* Left: Brand Logo */}
+        <div 
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          onClick={() => { window.location.href = '/'; }}
+        >
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Leaf size={16} color="#ffffff" />
+          </div>
+          <span style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.35rem', fontWeight: 700, color: 'var(--forest-dark)', letterSpacing: '-0.3px' }}>
+            NatureCure
+          </span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-light)', marginLeft: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            AI
+          </span>
+        </div>
+
+        {/* Center: Mode Indicator Badge */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 12px',
+          borderRadius: '20px',
+          background: mode === 'treatment' ? 'var(--gold-light)' : 'var(--cream)',
+          border: `1px solid ${mode === 'treatment' ? 'var(--gold)' : 'var(--sage)'}`,
+          fontSize: '0.775rem',
+          fontWeight: 600,
+          color: mode === 'treatment' ? 'var(--forest-dark)' : 'var(--forest)'
+        }}>
+          <span>{mode === 'treatment' ? '🏥' : '🌿'}</span>
+          <span>{mode === 'treatment' ? 'Clinical Treatment Mode' : 'Instant Holistic Query'}</span>
+        </div>
+
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <a
+                href="/history"
+                style={{
+                  textDecoration: 'none',
+                  fontSize: '0.8rem',
+                  color: 'var(--forest-dark)',
+                  fontWeight: 500,
+                  padding: '5px 12px',
+                  borderRadius: '16px',
+                  border: '1px solid var(--cream-dark)',
+                  background: 'var(--white)'
+                }}
+              >
+                📋 My Cases
+              </a>
+              <span style={{
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--forest-dark)',
+                padding: '4px 10px',
+                borderRadius: '16px',
+                background: 'var(--cream)',
+                border: '1px solid var(--cream-dark)'
+              }}>
+                👤 {currentUser.name || 'Patient'}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              style={{
+                background: 'var(--white)',
+                border: '1px solid var(--card-border)',
+                borderRadius: '16px',
+                padding: '5px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--forest-dark)',
+                cursor: 'pointer'
+              }}
+            >
+              Sign In
+            </button>
+          )}
+
+          <button
+            onClick={() => { window.location.href = '/'; }}
+            title="Start fresh session"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--cream-dark)',
+              borderRadius: '16px',
+              padding: '5px 10px',
+              fontSize: '0.775rem',
+              fontWeight: 500,
+              color: 'var(--text-light)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <RefreshCw size={12} /> New
+          </button>
+        </div>
+      </header>
 
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         
         {safetyFlags && <SafetyAlert flags={safetyFlags} />}
 
@@ -359,6 +468,10 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
             gap: '1.25rem' 
           }}
         >
+          {/* If Treatment Mode, show the horizontal 4-step progress tracker above the intake form */}
+          {mode === 'treatment' && !isComplete && (
+            <AssessmentProgress currentStep={step} variant="horizontal" />
+          )}
           {mode === 'treatment' && !isComplete ? (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -700,7 +813,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
               )}
             </motion.div>
           ) : (
-            <div style={{ width: '100%', maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {(() => {
                 const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
                 return messages.map((msg, idx) => {
@@ -792,7 +905,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
           )}
           
           {isTyping && (
-            <div style={{ width: '100%', maxWidth: '960px', display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+            <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', boxShadow: '0 2px 6px rgba(45, 62, 49, 0.2)' }}>
                 <Leaf size={18} color="#ffffff" />
               </div>
@@ -916,7 +1029,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
         {/* Input Area */}
         {!(mode === 'treatment' && !isComplete) && (
           <div style={{ padding: '0.85rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
