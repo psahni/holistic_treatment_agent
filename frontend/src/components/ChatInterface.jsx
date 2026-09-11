@@ -49,9 +49,10 @@ export default function ChatInterface({ sessionId, user }) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formStep, setFormStep] = useState(1);
-  const [useStreaming, setUseStreaming] = useState(true);
   
   const endOfMessagesRef = useRef(null);
+  const lastTurnRef = useRef(null);
+  const chatScrollContainerRef = useRef(null);
 
   useEffect(() => {
     if (sessionId === 'new' && !activeSessionId) {
@@ -209,7 +210,19 @@ export default function ChatInterface({ sessionId, user }) {
   };
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // When assistant message finishes rendering, anchor the user's question near the top so question + card are in view
+    if (!isTyping && messages.length > 1) {
+      const timer = setTimeout(() => {
+        if (lastTurnRef.current) {
+          lastTurnRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (isTyping) {
+      endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isTyping, isComplete]);
 
   const handleSend = async (customMessage = null) => {
@@ -220,102 +233,30 @@ export default function ChatInterface({ sessionId, user }) {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
-    let assistantMessageAdded = false;
     
     try {
-      if (!useStreaming) {
-        const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
-        setIsTyping(false);
-        setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
-        
-        if (reply.step) setStep(reply.step);
-        if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
-        if (reply.need_practitioner) setNeedsPractitioner(true);
-        if (reply.recommended_mode === "treatment") {
-          setSuggestedModeSwitch(true);
-          sessionStorage.setItem("pending_mode_switch", "treatment");
-        }
-        if (reply.is_complete || reply.assessment_complete) {
-          setIsComplete(true);
-          if (reply.report) setReport(reply.report);
-          if (mode === 'treatment') {
-            setTimeout(checkCaseReviewStatus, 1500);
-          }
-        }
-      } else {
-        const stream = naturopathyAPI.streamMessage(activeSessionId, userMessage, mode);
-        
-        for await (const data of stream) {
-          if (data.chunk) {
-            if (!assistantMessageAdded) {
-               setIsTyping(false);
-               assistantMessageAdded = true;
-               setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-            }
-            
-            const chars = data.chunk.split('');
-            for (let i = 0; i < chars.length; i++) {
-               await new Promise(r => setTimeout(r, 8)); // 8ms per char
-               setMessages(prev => {
-                 const newMessages = [...prev];
-                 const lastMsg = { ...newMessages[newMessages.length - 1] };
-                 lastMsg.content += chars[i];
-                 newMessages[newMessages.length - 1] = lastMsg;
-                 return newMessages;
-               });
-            }
-          }
-          
-          if (data.done && data.state) {
-            const response = data.state;
-            if (response.message || response.reply) {
-              if (!assistantMessageAdded) {
-                  setMessages(prev => [...prev, { role: 'assistant', content: response.message || response.reply }]);
-                  assistantMessageAdded = true;
-                  setIsTyping(false);
-              } else {
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    const lastMsg = { ...newMessages[newMessages.length - 1] };
-                    lastMsg.content = response.message || response.reply;
-                    newMessages[newMessages.length - 1] = lastMsg;
-                    return newMessages;
-                  });
-              }
-            }
-            if (response.step) setStep(response.step);
-            if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
-            if (response.need_practitioner) setNeedsPractitioner(true);
-            
-            if (response.recommended_mode === "treatment") {
-              setSuggestedModeSwitch(true);
-              sessionStorage.setItem("pending_mode_switch", "treatment");
-            }
-            
-            if (response.is_complete || response.assessment_complete) {
-              setIsComplete(true);
-              if (response.report) setReport(response.report);
-              if (mode === 'treatment') {
-                setTimeout(checkCaseReviewStatus, 1500);
-              }
-            }
-          }
+      const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
+      setIsTyping(false);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
+      
+      if (reply.step) setStep(reply.step);
+      if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
+      if (reply.need_practitioner) setNeedsPractitioner(true);
+      if (reply.recommended_mode === "treatment") {
+        setSuggestedModeSwitch(true);
+        sessionStorage.setItem("pending_mode_switch", "treatment");
+      }
+      if (reply.is_complete || reply.assessment_complete) {
+        setIsComplete(true);
+        if (reply.report) setReport(reply.report);
+        if (mode === 'treatment') {
+          setTimeout(checkCaseReviewStatus, 1500);
         }
       }
     } catch(err) {
       console.error(err);
       setIsTyping(false);
-      if (!assistantMessageAdded) {
-         setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
-      } else {
-         setMessages(prev => {
-           const newMessages = [...prev];
-           const lastMsg = { ...newMessages[newMessages.length - 1] };
-           lastMsg.content += "\n\n*(Error connecting to network)*";
-           newMessages[newMessages.length - 1] = lastMsg;
-           return newMessages;
-         });
-      }
+      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
     }
   };
 
@@ -334,7 +275,18 @@ export default function ChatInterface({ sessionId, user }) {
         
         {safetyFlags && <SafetyAlert flags={safetyFlags} />}
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div 
+          ref={chatScrollContainerRef}
+          style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '1.5rem 1.5rem 2rem', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            gap: '1.25rem' 
+          }}
+        >
           {mode === 'treatment' && !isComplete ? (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -617,95 +569,101 @@ export default function ChatInterface({ sessionId, user }) {
               )}
             </motion.div>
           ) : (
-            <>
-              {messages.map((msg, idx) => {
-                const isAssistant = msg.role === 'assistant';
-                const parsedRemedy = isAssistant ? parseRemedyContent(msg.content) : null;
-                const isStructuredBento = Boolean(parsedRemedy && parsedRemedy.isStructured);
+            <div style={{ width: '100%', maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {(() => {
+                const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
+                return messages.map((msg, idx) => {
+                  const isAssistant = msg.role === 'assistant';
+                  const parsedRemedy = isAssistant ? parseRemedyContent(msg.content) : null;
+                  const isStructuredBento = Boolean(parsedRemedy && parsedRemedy.isStructured);
+                  const isLastTurnUser = msg.role === 'user' && idx === lastUserIdx;
 
-                return (
-                  <motion.div 
-                    key={idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{
-                      display: 'flex',
-                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      alignItems: 'flex-start',
-                      gap: '0.5rem',
-                      width: '100%'
-                    }}
-                  >
-                    {isAssistant && (
-                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '4px' }}>
-                        <Leaf size={20} color="var(--cream)" />
-                      </div>
-                    )}
-                    
-                    <div 
-                      data-testid={isAssistant ? "assistant-message" : "user-message"}
+                  return (
+                    <motion.div 
+                      key={idx}
+                      ref={isLastTurnUser ? lastTurnRef : null}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       style={{
-                        maxWidth: isStructuredBento ? '95%' : '75%',
-                        width: isStructuredBento ? '100%' : 'auto',
-                        padding: isStructuredBento ? '0' : '1rem 1.5rem',
-                        borderRadius: isStructuredBento ? '20px' : '1.5rem',
-                        borderBottomLeftRadius: isAssistant ? 0 : '1.5rem',
-                        borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
-                        background: isStructuredBento ? 'transparent' : (msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)'),
-                        color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
-                        boxShadow: isStructuredBento ? 'none' : 'var(--shadow-sm)',
-                        lineHeight: 1.5
-                    }}>
-                      {isStructuredBento ? (
-                        <BentoRemedyGrid 
-                          data={parsedRemedy} 
-                          onConsultDoctor={() => setShowTransitionPrompt(true)} 
-                        />
-                      ) : (
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
-                            ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                            ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                            li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
-                            strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      )}
-
-                      {isAssistant && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && !isStructuredBento && (
-                        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
-                          <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-                            To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
-                          </p>
-                          <button 
-                            data-testid="switch-to-treatment-btn"
-                            onClick={() => setShowTransitionPrompt(true)}
-                            className="btn btn-primary"
-                            style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                          >
-                            🏥 Switch to Full Treatment Mode
-                          </button>
+                        display: 'flex',
+                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        alignItems: 'flex-start',
+                        gap: '0.65rem',
+                        width: '100%',
+                        scrollMarginTop: '1.25rem'
+                      }}
+                    >
+                      {isAssistant && (
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', boxShadow: '0 2px 6px rgba(45, 62, 49, 0.2)' }}>
+                          <Leaf size={18} color="#ffffff" />
                         </div>
                       )}
-                    </div>
-                  </motion.div>
-                );
-              })}
+                      
+                      <div 
+                        data-testid={isAssistant ? "assistant-message" : "user-message"}
+                        style={{
+                          maxWidth: isStructuredBento ? '100%' : '75%',
+                          width: isStructuredBento ? '100%' : 'auto',
+                          padding: isStructuredBento ? '0' : '0.85rem 1.25rem',
+                          borderRadius: isStructuredBento ? '16px' : '1.25rem',
+                          borderBottomLeftRadius: isAssistant ? 0 : '1.25rem',
+                          borderBottomRightRadius: msg.role === 'user' ? 0 : '1.25rem',
+                          background: isStructuredBento ? 'transparent' : (msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.85)'),
+                          color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
+                          boxShadow: isStructuredBento ? 'none' : 'var(--shadow-sm)',
+                          lineHeight: 1.5
+                      }}>
+                        {isStructuredBento ? (
+                          <BentoRemedyGrid 
+                            data={parsedRemedy} 
+                            onConsultDoctor={() => setShowTransitionPrompt(true)} 
+                          />
+                        ) : (
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
+                              ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                              ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                              li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
+                              strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        )}
+
+                        {isAssistant && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && !isStructuredBento && (
+                          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
+                            <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
+                              To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
+                            </p>
+                            <button 
+                              data-testid="switch-to-treatment-btn"
+                              onClick={() => setShowTransitionPrompt(true)}
+                              className="btn btn-primary"
+                              style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              🏥 Switch to Full Treatment Mode
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                });
+              })()}
 
               {messages.length <= 1 && mode === 'question' && !isTyping && !isComplete && (
                 <SymptomChips onSelectSymptom={(query) => handleSend(query)} />
               )}
-            </>
+            </div>
           )}
           
           {isTyping && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Leaf size={20} color="var(--cream)" />
+            <div style={{ width: '100%', maxWidth: '960px', display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', boxShadow: '0 2px 6px rgba(45, 62, 49, 0.2)' }}>
+                <Leaf size={18} color="#ffffff" />
               </div>
               <div className="glass-card" style={{ padding: '0 1rem' }}>
                 <Loader />
@@ -826,19 +784,8 @@ export default function ChatInterface({ sessionId, user }) {
 
         {/* Input Area */}
         {!(mode === 'treatment' && !isComplete) && (
-          <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
+          <div style={{ padding: '0.85rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={useStreaming} 
-                    onChange={e => setUseStreaming(e.target.checked)} 
-                    style={{ accentColor: 'var(--primary-green)', cursor: 'pointer' }} 
-                  />
-                  Enable Streaming Response
-                </label>
-              </div>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',

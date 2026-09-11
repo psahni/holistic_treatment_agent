@@ -1,6 +1,83 @@
 import { getRemedyImage, detectElements } from './remedyAssets';
 
 /**
+ * Strips conversational markdown noise, bullet markers, and greetings.
+ */
+function cleanItemText(raw) {
+  return raw
+    .replace(/^[0-9]+[.)]\s*|^[-*•]\s*/, '')
+    .replace(/\*\*/g, '')
+    .replace(/^hello again[!,.]?\s*/i, '')
+    .replace(/^certainly[!,.]?\s*/i, '')
+    .replace(/^here are some.*?:/i, '')
+    .replace(/^instant nature cure remedies:?/i, '')
+    .trim();
+}
+
+/**
+ * Formats section items into a clean title and distinct, non-redundant instruction steps.
+ */
+function processSectionItems(items, defaultTitle) {
+  if (!items || items.length === 0) {
+    return {
+      title: defaultTitle,
+      steps: ['Apply consistently as a daily restorative practice.']
+    };
+  }
+
+  const first = items[0];
+  let title = defaultTitle;
+  let cleanSteps = [];
+
+  // If first item contains "Title: Description" pattern
+  if (first.includes(':') && first.indexOf(':') < 40) {
+    const parts = first.split(':');
+    const potentialTitle = parts[0].trim();
+    if (potentialTitle.length >= 3 && potentialTitle.length <= 35) {
+      title = potentialTitle;
+      const remainder = parts.slice(1).join(':').trim();
+      if (remainder.length > 5) {
+        cleanSteps.push(remainder);
+      }
+    } else {
+      cleanSteps.push(first);
+    }
+  } else if (first.length <= 32 && !first.endsWith('.')) {
+    title = first;
+  } else {
+    // It's a sentence/paragraph, so keep default clean title and put the text in steps
+    cleanSteps.push(first);
+  }
+
+  // Process subsequent items
+  for (let i = 1; i < items.length; i++) {
+    let item = items[i];
+    // Strip redundant title prefixes like "Hydration and Diet: ..."
+    if (item.toLowerCase().startsWith(title.toLowerCase() + ':')) {
+      item = item.substring(title.length + 1).trim();
+    }
+    // Filter conversational filler
+    if (
+      item.toLowerCase().includes('keeping the mind active') &&
+      items.length > 2
+    ) {
+      continue;
+    }
+    if (item.length > 4) {
+      cleanSteps.push(item);
+    }
+  }
+
+  // Ensure steps has content
+  if (cleanSteps.length === 0) {
+    const fallbackText = first.replace(title, '').replace(/^[:\s-]+/, '').trim();
+    cleanSteps.push(fallbackText || first);
+  }
+
+  return { title, steps: cleanSteps.slice(0, 3) };
+}
+
+/**
  * Parses an assistant message to check if it contains structured Naturopathic remedies.
  * Returns structured card data if remedy patterns are detected;
  * otherwise returns { isStructured: false, rawContent: content } to render normal markdown.
@@ -19,7 +96,7 @@ export function parseRemedyContent(content) {
     lower.includes('kitchen pharmacy') ||
     lower.includes('hydrotherapy') ||
     lower.includes('diet therapy') ||
-    (lower.includes('remed') && lower.includes('step'));
+    (lower.includes('remed') && (lower.includes('tea') || lower.includes('pack') || lower.includes('breath')));
 
   // Markers that indicate it's purely a clarification, greeting, or intake question
   const isGreetingOrClarification = 
@@ -33,7 +110,6 @@ export function parseRemedyContent(content) {
   // Detect active Naturopathy elements (💧 Water, 🔥 Fire, etc.)
   const elements = detectElements(content);
 
-  // Sections extraction using regex & line splitting
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
   let kitchenItems = [];
@@ -41,10 +117,21 @@ export function parseRemedyContent(content) {
   let breathItems = [];
   let safetyItems = [];
 
-  let currentSection = 'general';
+  let currentSection = 'kitchen';
 
   for (const line of lines) {
     const lLower = line.toLowerCase();
+    
+    // Ignore pure section headers
+    if (
+      lLower === 'instant nature cure remedies:' ||
+      lLower === 'remedies:' ||
+      lLower.startsWith('## ') ||
+      lLower.startsWith('### ')
+    ) {
+      continue;
+    }
+
     if (lLower.includes('safety') || lLower.includes('red flag') || lLower.includes('caution') || lLower.includes('warning') || lLower.includes('⚠️')) {
       currentSection = 'safety';
       continue;
@@ -57,9 +144,8 @@ export function parseRemedyContent(content) {
       currentSection = 'kitchen';
     }
 
-    // Clean bullets
-    const cleanLine = line.replace(/^[0-9]+[.)]\s*|^[-*•]\s*/, '').replace(/\*\*/g, '').trim();
-    if (!cleanLine || cleanLine.length < 5) continue;
+    const cleanLine = cleanItemText(line);
+    if (!cleanLine || cleanLine.length < 4) continue;
 
     if (currentSection === 'safety') {
       safetyItems.push(cleanLine);
@@ -68,12 +154,11 @@ export function parseRemedyContent(content) {
     } else if (currentSection === 'breath') {
       breathItems.push(cleanLine);
     } else {
-      // General remedies / kitchen
       kitchenItems.push(cleanLine);
     }
   }
 
-  // Fallback: If kitchen items got all items and others are empty, distribute reasonably
+  // Distribute items if one category grabbed all
   if (hydrotherapyItems.length === 0 && kitchenItems.length > 2) {
     const hydroCandidates = kitchenItems.filter(item => {
       const it = item.toLowerCase();
@@ -88,7 +173,7 @@ export function parseRemedyContent(content) {
   if (breathItems.length === 0 && kitchenItems.length > 2) {
     const breathCandidates = kitchenItems.filter(item => {
       const it = item.toLowerCase();
-      return it.includes('breath') || it.includes('pranayama') || it.includes('walk') || it.includes('stress') || it.includes('sleep');
+      return it.includes('breath') || it.includes('pranayama') || it.includes('walk') || it.includes('stress') || it.includes('sleep') || it.includes('mind');
     });
     if (breathCandidates.length > 0) {
       breathItems = breathCandidates;
@@ -96,43 +181,38 @@ export function parseRemedyContent(content) {
     }
   }
 
-  // Construct structured data objects
-  const kitchenTitle = kitchenItems[0] ? kitchenItems[0].split(':')[0] : 'Herbal Kitchen Infusion';
-  const kitchenSteps = kitchenItems.slice(0, 4);
+  // Process sections into clean titles and steps
+  const processedKitchen = processSectionItems(kitchenItems, 'Herbal Kitchen Infusion');
+  const processedHydro = processSectionItems(hydrotherapyItems, 'Cold Wet Abdominal Pack');
+  const processedBreath = processSectionItems(breathItems, 'Restorative Deep Breathing');
 
-  const hydroTitle = hydrotherapyItems[0] ? hydrotherapyItems[0].split(':')[0] : 'Cold Wet Abdominal Pack';
-  const hydroSteps = hydrotherapyItems.slice(0, 3);
-
-  // Extract timing/duration if mentioned (e.g., "15 mins", "10 minutes")
+  // Extract timing/duration if mentioned
   const durationMatch = content.match(/(\d+[\s-]*(?:mins?|minutes?|hours?))/i);
   const durationBadge = durationMatch ? durationMatch[1] : '15 mins';
 
-  const breathTitle = breathItems[0] ? breathItems[0].split(':')[0] : 'Restorative Deep Breathing';
-  const breathSteps = breathItems.slice(0, 3);
-
   const safetyAlert = safetyItems.length > 0
     ? safetyItems.join(' · ')
-    : 'Avoid heavy, greasy meals. If symptoms worsen or persist for more than 48 hours, consult a healthcare provider.';
+    : 'Avoid heavy or processed foods. If acute symptoms persist or worsen, consult a certified AYUSH practitioner.';
 
   return {
     isStructured: true,
     rawContent: content,
     elements,
     kitchen: {
-      title: kitchenTitle,
-      steps: kitchenSteps,
-      image: getRemedyImage(kitchenTitle + ' ' + kitchenSteps.join(' '), 'kitchen')
+      title: processedKitchen.title,
+      steps: processedKitchen.steps,
+      image: getRemedyImage(processedKitchen.title + ' ' + processedKitchen.steps.join(' '), 'kitchen')
     },
     hydrotherapy: {
-      title: hydroTitle,
+      title: processedHydro.title,
       duration: durationBadge,
-      steps: hydroSteps,
-      image: getRemedyImage(hydroTitle + ' ' + hydroSteps.join(' '), 'hydrotherapy')
+      steps: processedHydro.steps,
+      image: getRemedyImage(processedHydro.title + ' ' + processedHydro.steps.join(' '), 'hydrotherapy')
     },
     breath: {
-      title: breathTitle,
-      steps: breathSteps,
-      image: getRemedyImage(breathTitle + ' ' + breathSteps.join(' '), 'breath')
+      title: processedBreath.title,
+      steps: processedBreath.steps,
+      image: getRemedyImage(processedBreath.title + ' ' + processedBreath.steps.join(' '), 'breath')
     },
     safety: safetyAlert
   };

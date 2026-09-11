@@ -63,7 +63,7 @@ describe('ChatInterface Component', () => {
     fireEvent.click(chip);
 
     await waitFor(() => {
-      expect(naturopathyAPI.streamMessage).toHaveBeenCalled();
+      expect(naturopathyAPI.sendMessage).toHaveBeenCalledWith('test-session-123', 'I have severe acid reflux and stomach bloating after meals. What natural remedies do you suggest?', 'question');
     });
   });
 });
