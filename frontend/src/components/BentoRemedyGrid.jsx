@@ -47,7 +47,7 @@ export default function BentoRemedyGrid({ data, onConsultDoctor }) {
           <span style={{ fontSize: '1.1rem' }}>🌿</span>
           <h3
             style={{
-              fontFamily: 'Playfair Display, serif',
+              fontFamily: 'var(--font-serif)',
               fontSize: '1.3rem',
               color: 'var(--text-main)',
               margin: 0,

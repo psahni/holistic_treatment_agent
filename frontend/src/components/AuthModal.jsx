@@ -69,7 +69,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     <div className="modal-overlay">
       <div className="modal-content animate-fade-in" style={{ maxWidth: '400px' }}>
         <button className="modal-close" onClick={onClose}>&times;</button>
-        <h3 style={{ marginBottom: '0.5rem', fontFamily: 'Playfair Display, serif', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
+        <h3 style={{ marginBottom: '0.5rem', fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
           {isLogin ? 'Welcome Back' : 'Create an Account'}
         </h3>
         <p style={{ marginBottom: '1.5rem', color: 'var(--text-light)', fontSize: '0.9rem' }}>

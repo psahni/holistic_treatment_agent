@@ -252,7 +252,7 @@ export default function BreathingPacer({ initialPattern = '478', onClose }) {
           <span
             data-testid="pacer-phase"
             style={{
-              fontFamily: 'Playfair Display, serif',
+              fontFamily: 'var(--font-serif)',
               fontSize: '1.5rem',
               fontWeight: 700,
               color: 'var(--forest-dark)'

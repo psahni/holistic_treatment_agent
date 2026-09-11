@@ -355,7 +355,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Leaf size={16} color="#ffffff" />
           </div>
-          <span style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.35rem', fontWeight: 700, color: 'var(--forest-dark)', letterSpacing: '-0.3px' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', fontWeight: 700, color: 'var(--forest-dark)', letterSpacing: '-0.3px' }}>
             NatureCure
           </span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-light)', marginLeft: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -490,7 +490,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
-                  <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'Playfair Display, serif', fontSize: '1.75rem' }}>
+                  <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'var(--font-serif)', fontSize: '1.75rem' }}>
                     📋 Comprehensive Health Intake
                   </h3>
                   {hasSavedDraft && (
@@ -935,7 +935,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
               }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 2s infinite' }}>⏳</div>
-              <h3 style={{ color: 'var(--primary-green)', marginBottom: '1rem', fontFamily: 'Playfair Display, serif' }}>
+              <h3 style={{ color: 'var(--primary-green)', marginBottom: '1rem', fontFamily: 'var(--font-serif)' }}>
                 Intake Complete — Case Pending Review
               </h3>
               <p style={{ color: 'var(--text-light)', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto 2rem' }}>
@@ -969,7 +969,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--cream-dark)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
                 <div>
-                  <h2 style={{ color: 'var(--primary-green)', margin: 0, fontFamily: 'Playfair Display, serif' }}>🌿 Approved Nature Cure Protocol</h2>
+                  <h2 style={{ color: 'var(--primary-green)', margin: 0, fontFamily: 'var(--font-serif)' }}>🌿 Approved Nature Cure Protocol</h2>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Verified by Certified AYUSH N.D.</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -1103,7 +1103,7 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
           <div className="modal-content animate-fade-in" style={{ maxWidth: '550px', padding: '2.5rem', textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>🏥</div>
-            <h3 style={{ marginBottom: '1.25rem', fontFamily: 'Playfair Display, serif', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
+            <h3 style={{ marginBottom: '1.25rem', fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
               Full Treatment Mode Suggested
             </h3>
             

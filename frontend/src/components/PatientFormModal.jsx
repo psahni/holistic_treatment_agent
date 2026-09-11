@@ -80,7 +80,7 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: 'Playfair Display, serif', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
+            <h3 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
               Start Your Assessment
             </h3>
             {hasSavedProfile && (
