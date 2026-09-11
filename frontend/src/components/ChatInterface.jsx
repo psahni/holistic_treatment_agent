@@ -10,8 +10,11 @@ import RecommendationCard from './RecommendationCard';
 import SafetyAlert from './SafetyAlert';
 import Loader from './Loader';
 import AuthModal from './AuthModal';
+import BentoRemedyGrid from './BentoRemedyGrid';
+import SymptomChips from './SymptomChips';
+import { parseRemedyContent } from '../lib/parseRemedyContent';
 
-export default function ChatInterface({ sessionId, user }) {
+export default function ChatInterface({ sessionId, user, initialMode = 'question' }) {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(sessionId !== 'new' ? sessionId : null);
@@ -24,7 +27,7 @@ export default function ChatInterface({ sessionId, user }) {
   const [needsPractitioner, setNeedsPractitioner] = useState(false);
   
   // Custom states for Treatment Mode & Auth Gating
-  const [mode, setMode] = useState('question');
+  const [mode, setMode] = useState(initialMode);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showTransitionPrompt, setShowTransitionPrompt] = useState(false);
@@ -46,9 +49,12 @@ export default function ChatInterface({ sessionId, user }) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formStep, setFormStep] = useState(1);
-  const [useStreaming, setUseStreaming] = useState(true);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [autofillNotice, setAutofillNotice] = useState('');
   
   const endOfMessagesRef = useRef(null);
+  const lastTurnRef = useRef(null);
+  const chatScrollContainerRef = useRef(null);
 
   useEffect(() => {
     if (sessionId === 'new' && !activeSessionId) {
@@ -60,7 +66,77 @@ export default function ChatInterface({ sessionId, user }) {
     if (user?.loggedInUser) {
       setCurrentUser(user.loggedInUser);
     }
+
+    // Hydrate assessment form draft from browser localStorage
+    try {
+      const savedDraft = localStorage.getItem('naturecure_intake_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && typeof parsed === 'object') {
+          const hasContent = Object.entries(parsed).some(([k, v]) => k !== 'response_3' && typeof v === 'string' && v.trim());
+          if (hasContent) {
+            setFormResponses(prev => ({ ...prev, ...parsed }));
+            setHasSavedDraft(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load saved intake draft:', e);
+    }
   }, []);
+
+  const updateFormResponse = (field, value) => {
+    setFormResponses(prev => {
+      const next = { ...prev, [field]: value };
+      try {
+        localStorage.setItem('naturecure_intake_draft', JSON.stringify(next));
+        setHasSavedDraft(true);
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleAutofillIntake = () => {
+    const sample = {
+      response_1: 'Chronic acid reflux, burning sensation in upper chest, and stomach bloating after meals.',
+      response_2: 'About 6 months, worsening with work stress and late dinners',
+      response_3: '6',
+      response_4: 'Mild seasonal pollen allergies. No history of hypertension, surgeries, or cardiac issues.',
+      response_5: 'Occasional calcium antacids, daily Vitamin B-complex.',
+      response_6: 'Vegetarian diet, irregular dinner timings, high tea intake and evening fried snacks.',
+      response_7: '6 hours disturbed sleep, desk-bound sedentary office job, moderate daily stress.',
+      response_8: 'Pollen and dust allergies. Not pregnant.'
+    };
+    setFormResponses(sample);
+    setFormError('');
+    setAutofillNotice('Sample assessment details autofilled & saved to browser memory!');
+    try {
+      localStorage.setItem('naturecure_intake_draft', JSON.stringify(sample));
+      setHasSavedDraft(true);
+    } catch (e) {}
+    setTimeout(() => setAutofillNotice(''), 3000);
+  };
+
+  const handleClearIntake = () => {
+    const empty = {
+      response_1: '',
+      response_2: '',
+      response_3: '5',
+      response_4: '',
+      response_5: '',
+      response_6: '',
+      response_7: '',
+      response_8: ''
+    };
+    setFormResponses(empty);
+    setFormError('');
+    setAutofillNotice('Assessment form cleared.');
+    try {
+      localStorage.removeItem('naturecure_intake_draft');
+      setHasSavedDraft(false);
+    } catch (e) {}
+    setTimeout(() => setAutofillNotice(''), 2500);
+  };
 
   const checkCaseReviewStatus = async () => {
     if (!activeSessionId) return;
@@ -206,131 +282,196 @@ export default function ChatInterface({ sessionId, user }) {
   };
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // When assistant message finishes rendering, anchor the user's question near the top so question + card are in view
+    if (!isTyping && messages.length > 1) {
+      const timer = setTimeout(() => {
+        if (lastTurnRef.current) {
+          lastTurnRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else if (isTyping) {
+      endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isTyping, isComplete]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (customMessage = null) => {
+    const textToSend = customMessage !== null ? customMessage : input;
+    if (!textToSend?.trim()) return;
     
-    const userMessage = input.trim();
+    const userMessage = textToSend.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
-    let assistantMessageAdded = false;
     
     try {
-      if (!useStreaming) {
-        const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
-        setIsTyping(false);
-        setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
-        
-        if (reply.step) setStep(reply.step);
-        if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
-        if (reply.need_practitioner) setNeedsPractitioner(true);
-        if (reply.recommended_mode === "treatment") {
-          setSuggestedModeSwitch(true);
-          sessionStorage.setItem("pending_mode_switch", "treatment");
-        }
-        if (reply.is_complete || reply.assessment_complete) {
-          setIsComplete(true);
-          if (reply.report) setReport(reply.report);
-          if (mode === 'treatment') {
-            setTimeout(checkCaseReviewStatus, 1500);
-          }
-        }
-      } else {
-        const stream = naturopathyAPI.streamMessage(activeSessionId, userMessage, mode);
-        
-        for await (const data of stream) {
-          if (data.chunk) {
-            if (!assistantMessageAdded) {
-               setIsTyping(false);
-               assistantMessageAdded = true;
-               setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-            }
-            
-            const chars = data.chunk.split('');
-            for (let i = 0; i < chars.length; i++) {
-               await new Promise(r => setTimeout(r, 8)); // 8ms per char
-               setMessages(prev => {
-                 const newMessages = [...prev];
-                 const lastMsg = { ...newMessages[newMessages.length - 1] };
-                 lastMsg.content += chars[i];
-                 newMessages[newMessages.length - 1] = lastMsg;
-                 return newMessages;
-               });
-            }
-          }
-          
-          if (data.done && data.state) {
-            const response = data.state;
-            if (response.message || response.reply) {
-              if (!assistantMessageAdded) {
-                  setMessages(prev => [...prev, { role: 'assistant', content: response.message || response.reply }]);
-                  assistantMessageAdded = true;
-                  setIsTyping(false);
-              } else {
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    const lastMsg = { ...newMessages[newMessages.length - 1] };
-                    lastMsg.content = response.message || response.reply;
-                    newMessages[newMessages.length - 1] = lastMsg;
-                    return newMessages;
-                  });
-              }
-            }
-            if (response.step) setStep(response.step);
-            if (response.safety_flags?.length) setSafetyFlags(response.safety_flags);
-            if (response.need_practitioner) setNeedsPractitioner(true);
-            
-            if (response.recommended_mode === "treatment") {
-              setSuggestedModeSwitch(true);
-              sessionStorage.setItem("pending_mode_switch", "treatment");
-            }
-            
-            if (response.is_complete || response.assessment_complete) {
-              setIsComplete(true);
-              if (response.report) setReport(response.report);
-              if (mode === 'treatment') {
-                setTimeout(checkCaseReviewStatus, 1500);
-              }
-            }
-          }
+      const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
+      setIsTyping(false);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
+      
+      if (reply.step) setStep(reply.step);
+      if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
+      if (reply.need_practitioner) setNeedsPractitioner(true);
+      if (reply.recommended_mode === "treatment") {
+        setSuggestedModeSwitch(true);
+        sessionStorage.setItem("pending_mode_switch", "treatment");
+      }
+      if (reply.is_complete || reply.assessment_complete) {
+        setIsComplete(true);
+        if (reply.report) setReport(reply.report);
+        if (mode === 'treatment') {
+          setTimeout(checkCaseReviewStatus, 1500);
         }
       }
     } catch(err) {
       console.error(err);
       setIsTyping(false);
-      if (!assistantMessageAdded) {
-         setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
-      } else {
-         setMessages(prev => {
-           const newMessages = [...prev];
-           const lastMsg = { ...newMessages[newMessages.length - 1] };
-           lastMsg.content += "\n\n*(Error connecting to network)*";
-           newMessages[newMessages.length - 1] = lastMsg;
-           return newMessages;
-         });
-      }
+      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
     }
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--cream)', flexDirection: 'row' }}>
-      {/* Sidebar - Desktop */}
-      <div style={{ width: '300px', borderRight: '1px solid var(--cream-dark)', padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-        <h2 style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Leaf color="var(--forest)" /> NatureCure
-        </h2>
-        <AssessmentProgress currentStep={step} />
-      </div>
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--cream)', flexDirection: 'column' }}>
+      {/* Sleek Top Navigation Bar */}
+      <header style={{
+        height: '60px',
+        borderBottom: '1px solid var(--cream-dark)',
+        background: 'rgba(255, 255, 255, 0.92)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 2rem',
+        flexShrink: 0,
+        zIndex: 10
+      }}>
+        {/* Left: Brand Logo */}
+        <div 
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          onClick={() => { window.location.href = '/'; }}
+        >
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Leaf size={16} color="#ffffff" />
+          </div>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', fontWeight: 700, color: 'var(--forest-dark)', letterSpacing: '-0.3px' }}>
+            NatureCure
+          </span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-light)', marginLeft: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            AI
+          </span>
+        </div>
+
+        {/* Center: Mode Indicator Badge */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 12px',
+          borderRadius: '20px',
+          background: mode === 'treatment' ? 'var(--gold-light)' : 'var(--cream)',
+          border: `1px solid ${mode === 'treatment' ? 'var(--gold)' : 'var(--sage)'}`,
+          fontSize: '0.775rem',
+          fontWeight: 600,
+          color: mode === 'treatment' ? 'var(--forest-dark)' : 'var(--forest)'
+        }}>
+          <span>{mode === 'treatment' ? '🏥' : '🌿'}</span>
+          <span>{mode === 'treatment' ? 'Clinical Treatment Mode' : 'Instant Holistic Query'}</span>
+        </div>
+
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <a
+                href="/history"
+                style={{
+                  textDecoration: 'none',
+                  fontSize: '0.8rem',
+                  color: 'var(--forest-dark)',
+                  fontWeight: 500,
+                  padding: '5px 12px',
+                  borderRadius: '16px',
+                  border: '1px solid var(--cream-dark)',
+                  background: 'var(--white)'
+                }}
+              >
+                📋 My Cases
+              </a>
+              <span style={{
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--forest-dark)',
+                padding: '4px 10px',
+                borderRadius: '16px',
+                background: 'var(--cream)',
+                border: '1px solid var(--cream-dark)'
+              }}>
+                👤 {currentUser.name || 'Patient'}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              style={{
+                background: 'var(--white)',
+                border: '1px solid var(--card-border)',
+                borderRadius: '16px',
+                padding: '5px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--forest-dark)',
+                cursor: 'pointer'
+              }}
+            >
+              Sign In
+            </button>
+          )}
+
+          <button
+            onClick={() => { window.location.href = '/'; }}
+            title="Start fresh session"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--cream-dark)',
+              borderRadius: '16px',
+              padding: '5px 10px',
+              fontSize: '0.775rem',
+              fontWeight: 500,
+              color: 'var(--text-light)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <RefreshCw size={12} /> New
+          </button>
+        </div>
+      </header>
 
       {/* Main Chat Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         
         {safetyFlags && <SafetyAlert flags={safetyFlags} />}
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div 
+          ref={chatScrollContainerRef}
+          style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '1.5rem 1.5rem 2rem', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            gap: '1.25rem' 
+          }}
+        >
+          {/* If Treatment Mode, show the horizontal 4-step progress tracker above the intake form */}
+          {mode === 'treatment' && !isComplete && (
+            <AssessmentProgress currentStep={step} variant="horizontal" />
+          )}
           {mode === 'treatment' && !isComplete ? (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -347,14 +488,73 @@ export default function ChatInterface({ sessionId, user }) {
                 width: '100%'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem' }}>
-                <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'Playfair Display, serif', fontSize: '1.75rem' }}>
-                  📋 Comprehensive Health Intake
-                </h3>
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--forest)', background: 'var(--cream)', padding: '6px 12px', borderRadius: '20px' }}>
-                  Step {formStep} of 3
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'var(--font-serif)', fontSize: '1.75rem' }}>
+                    📋 Comprehensive Health Intake
+                  </h3>
+                  {hasSavedDraft && (
+                    <span style={{ fontSize: '0.75rem', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span>
+                      Saved in browser memory
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleAutofillIntake}
+                    title="Autofill realistic sample assessment details"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      background: 'var(--cream)',
+                      border: '1.5px solid var(--forest)',
+                      color: 'var(--forest)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    ✨ Autofill Details
+                  </button>
+                  {hasSavedDraft && (
+                    <button
+                      type="button"
+                      onClick={handleClearIntake}
+                      title="Clear form inputs"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '6px 10px',
+                        borderRadius: '20px',
+                        background: 'transparent',
+                        border: '1px solid var(--cream-dark)',
+                        color: 'var(--text-light)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Clear
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--forest)', background: 'var(--cream)', padding: '6px 12px', borderRadius: '20px' }}>
+                    Step {formStep} of 3
+                  </span>
+                </div>
               </div>
+
+              {autofillNotice && (
+                <div style={{ padding: '0.6rem 1rem', backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '1.25rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>✓</span> {autofillNotice}
+                </div>
+              )}
 
               {/* Progress Bar indicator */}
               <div style={{ width: '100%', height: '4px', background: 'var(--cream-dark)', borderRadius: '2px', marginBottom: '2rem', overflow: 'hidden' }}>
@@ -381,7 +581,7 @@ export default function ChatInterface({ sessionId, user }) {
                       placeholder="Describe your primary complaint (e.g. chronic bloating, fatigue, skin rashes)..."
                       required
                       value={formResponses.response_1}
-                      onChange={e => setFormResponses({ ...formResponses, response_1: e.target.value })}
+                      onChange={e => updateFormResponse('response_1', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -397,7 +597,7 @@ export default function ChatInterface({ sessionId, user }) {
                         placeholder="e.g. 5 years, 3 months"
                         required
                         value={formResponses.response_2}
-                        onChange={e => setFormResponses({ ...formResponses, response_2: e.target.value })}
+                        onChange={e => updateFormResponse('response_2', e.target.value)}
                         style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                       />
                     </div>
@@ -411,7 +611,7 @@ export default function ChatInterface({ sessionId, user }) {
                           min="1"
                           max="10"
                           value={formResponses.response_3}
-                          onChange={e => setFormResponses({ ...formResponses, response_3: e.target.value })}
+                          onChange={e => updateFormResponse('response_3', e.target.value)}
                           style={{ flex: 1, accentColor: 'var(--forest)' }}
                         />
                         <span style={{ fontWeight: 'bold', minWidth: '24px', textAlign: 'center', background: 'var(--cream)', padding: '4px 8px', borderRadius: '4px' }}>
@@ -430,7 +630,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="List allergies or check if pregnant (write 'None' if not applicable)..."
                       value={formResponses.response_8}
-                      onChange={e => setFormResponses({ ...formResponses, response_8: e.target.value })}
+                      onChange={e => updateFormResponse('response_8', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -467,7 +667,7 @@ export default function ChatInterface({ sessionId, user }) {
                       placeholder="Any past diagnoses or existing conditions (e.g. hypothyroidism, hypertension, diabetes)..."
                       required
                       value={formResponses.response_4}
-                      onChange={e => setFormResponses({ ...formResponses, response_4: e.target.value })}
+                      onChange={e => updateFormResponse('response_4', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -481,7 +681,7 @@ export default function ChatInterface({ sessionId, user }) {
                       rows="2"
                       placeholder="List any ongoing medications, thyroid supplements, or vitamins..."
                       value={formResponses.response_5}
-                      onChange={e => setFormResponses({ ...formResponses, response_5: e.target.value })}
+                      onChange={e => updateFormResponse('response_5', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -495,7 +695,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="e.g. vegetarian, high-protein, normal appetite, water intake..."
                       value={formResponses.response_6}
-                      onChange={e => setFormResponses({ ...formResponses, response_6: e.target.value })}
+                      onChange={e => updateFormResponse('response_6', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -509,7 +709,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="e.g. 6 hours sleep, moderate stress, sedentary job..."
                       value={formResponses.response_7}
-                      onChange={e => setFormResponses({ ...formResponses, response_7: e.target.value })}
+                      onChange={e => updateFormResponse('response_7', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -613,73 +813,101 @@ export default function ChatInterface({ sessionId, user }) {
               )}
             </motion.div>
           ) : (
-            messages.map((msg, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{
-                  display: 'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  alignItems: 'flex-end',
-                  gap: '0.5rem'
-                }}
-              >
-                {msg.role === 'assistant' && (
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Leaf size={20} color="var(--cream)" />
-                  </div>
-                )}
-                
-                <div 
-                  data-testid={msg.role === 'assistant' ? "assistant-message" : "user-message"}
-                  style={{
-                    maxWidth: '70%',
-                    padding: '1rem 1.5rem',
-                    borderRadius: '1.5rem',
-                    borderBottomLeftRadius: msg.role === 'assistant' ? 0 : '1.5rem',
-                    borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
-                    background: msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)',
-                    color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
-                    boxShadow: 'var(--shadow-sm)',
-                    lineHeight: 1.5
-                }}>
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
-                      ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                      ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                      li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
-                      strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                  {msg.role === 'assistant' && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && (
-                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
-                      <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-                        To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
-                      </p>
-                      <button 
-                        data-testid="switch-to-treatment-btn"
-                        onClick={() => setShowTransitionPrompt(true)}
-                        className="btn btn-primary"
-                        style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        🏥 Switch to Full Treatment Mode
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))
+            <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {(() => {
+                const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
+                return messages.map((msg, idx) => {
+                  const isAssistant = msg.role === 'assistant';
+                  const parsedRemedy = isAssistant ? parseRemedyContent(msg.content) : null;
+                  const isStructuredBento = Boolean(parsedRemedy && parsedRemedy.isStructured);
+                  const isLastTurnUser = msg.role === 'user' && idx === lastUserIdx;
+
+                  return (
+                    <motion.div 
+                      key={idx}
+                      ref={isLastTurnUser ? lastTurnRef : null}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        display: 'flex',
+                        justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        alignItems: 'flex-start',
+                        gap: '0.65rem',
+                        width: '100%',
+                        scrollMarginTop: '1.25rem'
+                      }}
+                    >
+                      {isAssistant && (
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', boxShadow: '0 2px 6px rgba(45, 62, 49, 0.2)' }}>
+                          <Leaf size={18} color="#ffffff" />
+                        </div>
+                      )}
+                      
+                      <div 
+                        data-testid={isAssistant ? "assistant-message" : "user-message"}
+                        style={{
+                          maxWidth: isStructuredBento ? '100%' : '75%',
+                          width: isStructuredBento ? '100%' : 'auto',
+                          padding: isStructuredBento ? '0' : '0.85rem 1.25rem',
+                          borderRadius: isStructuredBento ? '16px' : '1.25rem',
+                          borderBottomLeftRadius: isAssistant ? 0 : '1.25rem',
+                          borderBottomRightRadius: msg.role === 'user' ? 0 : '1.25rem',
+                          background: isStructuredBento ? 'transparent' : (msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.85)'),
+                          color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
+                          boxShadow: isStructuredBento ? 'none' : 'var(--shadow-sm)',
+                          lineHeight: 1.5
+                      }}>
+                        {isStructuredBento ? (
+                          <BentoRemedyGrid 
+                            data={parsedRemedy} 
+                            onConsultDoctor={() => setShowTransitionPrompt(true)} 
+                          />
+                        ) : (
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
+                              ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                              ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                              li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
+                              strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        )}
+
+                        {isAssistant && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && !isStructuredBento && (
+                          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
+                            <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
+                              To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
+                            </p>
+                            <button 
+                              data-testid="switch-to-treatment-btn"
+                              onClick={() => setShowTransitionPrompt(true)}
+                              className="btn btn-primary"
+                              style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              🏥 Switch to Full Treatment Mode
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                });
+              })()}
+
+              {messages.length <= 1 && mode === 'question' && !isTyping && !isComplete && (
+                <SymptomChips onSelectSymptom={(query) => handleSend(query)} />
+              )}
+            </div>
           )}
           
           {isTyping && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Leaf size={20} color="var(--cream)" />
+            <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', boxShadow: '0 2px 6px rgba(45, 62, 49, 0.2)' }}>
+                <Leaf size={18} color="#ffffff" />
               </div>
               <div className="glass-card" style={{ padding: '0 1rem' }}>
                 <Loader />
@@ -707,7 +935,7 @@ export default function ChatInterface({ sessionId, user }) {
               }}
             >
               <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 2s infinite' }}>⏳</div>
-              <h3 style={{ color: 'var(--primary-green)', marginBottom: '1rem', fontFamily: 'Playfair Display, serif' }}>
+              <h3 style={{ color: 'var(--primary-green)', marginBottom: '1rem', fontFamily: 'var(--font-serif)' }}>
                 Intake Complete — Case Pending Review
               </h3>
               <p style={{ color: 'var(--text-light)', lineHeight: '1.6', maxWidth: '600px', margin: '0 auto 2rem' }}>
@@ -741,7 +969,7 @@ export default function ChatInterface({ sessionId, user }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--cream-dark)', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
                 <div>
-                  <h2 style={{ color: 'var(--primary-green)', margin: 0, fontFamily: 'Playfair Display, serif' }}>🌿 Approved Nature Cure Protocol</h2>
+                  <h2 style={{ color: 'var(--primary-green)', margin: 0, fontFamily: 'var(--font-serif)' }}>🌿 Approved Nature Cure Protocol</h2>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Verified by Certified AYUSH N.D.</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -800,19 +1028,8 @@ export default function ChatInterface({ sessionId, user }) {
 
         {/* Input Area */}
         {!(mode === 'treatment' && !isComplete) && (
-          <div style={{ padding: '1.25rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={useStreaming} 
-                    onChange={e => setUseStreaming(e.target.checked)} 
-                    style={{ accentColor: 'var(--primary-green)', cursor: 'pointer' }} 
-                  />
-                  Enable Streaming Response
-                </label>
-              </div>
+          <div style={{ padding: '0.85rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -886,7 +1103,7 @@ export default function ChatInterface({ sessionId, user }) {
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
           <div className="modal-content animate-fade-in" style={{ maxWidth: '550px', padding: '2.5rem', textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>🏥</div>
-            <h3 style={{ marginBottom: '1.25rem', fontFamily: 'Playfair Display, serif', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
+            <h3 style={{ marginBottom: '1.25rem', fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--primary-green)' }}>
               Full Treatment Mode Suggested
             </h3>
             

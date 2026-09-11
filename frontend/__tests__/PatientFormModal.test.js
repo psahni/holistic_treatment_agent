@@ -1,53 +1,83 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import PatientFormModal from '../src/components/PatientFormModal';
-import { naturopathyAPI } from '../src/services/api';
-
-jest.mock('../src/services/api', () => ({
-  naturopathyAPI: {
-    startSession: jest.fn(),
-  },
-}));
 
 describe('PatientFormModal Component', () => {
   beforeEach(() => {
+    localStorage.clear();
     jest.clearAllMocks();
   });
 
-  test('renders form fields', () => {
-    render(<PatientFormModal isOpen={true} onClose={() => {}} onSubmit={() => {}} mode="question" />);
-    expect(screen.getByPlaceholderText(/Full Name/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Age/i)).toBeInTheDocument();
+  test('renders form fields, title, and autofill button', () => {
+    render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={() => {}} />);
+    expect(screen.getByText(/Start Your Assessment/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Name$/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Age$/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Region/i)).toBeInTheDocument();
+    expect(screen.getByText(/✨ Autofill Details/i)).toBeInTheDocument();
   });
 
-  test('submits form with patient details', async () => {
-    const onSubmit = jest.fn();
-    render(<PatientFormModal isOpen={true} onClose={() => {}} onSubmit={onSubmit} mode="question" />);
+  test('autofills sample details when Autofill Details button is clicked', () => {
+    render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={() => {}} />);
     
-    fireEvent.change(screen.getByPlaceholderText(/Full Name/i), { target: { value: 'John Doe' } });
-    fireEvent.change(screen.getByPlaceholderText(/Age/i), { target: { value: '35' } });
-    fireEvent.change(screen.getByPlaceholderText(/City/i), { target: { value: 'Mumbai' } });
-    fireEvent.change(screen.getByPlaceholderText(/Contact Number/i), { target: { value: '9876543210' } });
-    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: 'john@example.com' } });
+    const autofillBtn = screen.getByText(/✨ Autofill Details/i);
+    fireEvent.click(autofillBtn);
 
-    fireEvent.click(screen.getByRole('button', { name: /Start/i }));
+    expect(screen.getByDisplayValue('Rohan Sharma')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('32')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveValue('male');
+    expect(screen.getByDisplayValue('New Delhi, India')).toBeInTheDocument();
+    expect(screen.getByText(/Details autofilled!/i)).toBeInTheDocument();
+    
+    // Check localStorage persistence
+    const saved = JSON.parse(localStorage.getItem('naturecure_visitor_profile'));
+    expect(saved.name).toBe('Rohan Sharma');
+  });
 
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith({
-        name: 'John Doe',
-        age: 35,
-        city: 'Mumbai',
-        phone: '9876543210',
-        email: 'john@example.com'
-      });
+  test('hydrates saved profile from localStorage on open', () => {
+    const savedData = {
+      name: 'Priya Patel',
+      age: '28',
+      gender: 'female',
+      region: 'Bangalore, India',
+      investigations: 'Iron deficiency'
+    };
+    localStorage.setItem('naturecure_visitor_profile', JSON.stringify(savedData));
+
+    render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={() => {}} />);
+    
+    expect(screen.getByDisplayValue('Priya Patel')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('28')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Bangalore, India')).toBeInTheDocument();
+    expect(screen.getByText(/Saved in browser memory/i)).toBeInTheDocument();
+  });
+
+  test('submits form with patient details when Begin Your Assessment is clicked', () => {
+    const onStart = jest.fn();
+    render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={onStart} />);
+    
+    fireEvent.change(screen.getByPlaceholderText(/^Name$/i), { target: { value: 'Alex Chen' } });
+    fireEvent.change(screen.getByPlaceholderText(/^Age$/i), { target: { value: '40' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'other' } });
+    fireEvent.change(screen.getByPlaceholderText(/Region/i), { target: { value: 'Singapore' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Begin Your Assessment/i }));
+
+    expect(onStart).toHaveBeenCalledWith('new', {
+      name: 'Alex Chen',
+      age: '40',
+      gender: 'other',
+      region: 'Singapore',
+      investigations: ''
     });
   });
 
-  test('closes modal when cancel is clicked', () => {
+  test('closes modal when close icon is clicked', () => {
     const onClose = jest.fn();
-    render(<PatientFormModal isOpen={true} onClose={onClose} onSubmit={() => {}} mode="question" />);
+    render(<PatientFormModal isOpen={true} onClose={onClose} onStart={() => {}} />);
     
-    fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: '×' }));
     expect(onClose).toHaveBeenCalled();
   });
 });
+

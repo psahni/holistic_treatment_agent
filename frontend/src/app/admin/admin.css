@@ -33,7 +33,7 @@
 }
 
 .admin-login-header h2 {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-serif);
   color: var(--text-main);
   margin-top: 0;
   margin-bottom: 0.5rem;
@@ -98,7 +98,7 @@
 }
 
 .admin-header h1 {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-serif);
   margin: 0;
   font-size: 1.5rem;
   color: var(--text-main);
