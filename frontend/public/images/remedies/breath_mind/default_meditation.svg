@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="dmBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBF8EE"/>
+      <stop offset="1" stop-color="#ECE8DC"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#dmBg)"/>
+
+  <!-- Sun / Zen Circle -->
+  <circle cx="160" cy="85" r="45" fill="#FEF3C7" stroke="#FDE68A" stroke-width="2"/>
+  <ellipse cx="160" cy="140" rx="55" ry="10" fill="#E2D9C2" opacity="0.6"/>
+
+  <!-- Meditating Silhouette -->
+  <circle cx="160" cy="62" r="9" fill="#48633B"/>
+  <path d="M148 76C148 73 152 72 160 72C168 72 172 73 172 76L176 100C176 105 170 108 160 108C150 108 144 105 144 100L148 76Z" fill="#48633B"/>
+  <!-- Crossed legs -->
+  <path d="M135 105C135 98 145 102 160 102C175 102 185 98 185 105C185 112 175 115 160 115C145 115 135 112 135 105Z" fill="#3A502F"/>
+
+  <text x="160" y="165" text-anchor="middle" font-family="'Inter', sans-serif" font-size="11" font-weight="600" fill="#48633B" letter-spacing="1">MIND-BODY &amp; RESTORATIVE PRACTICES</text>
+</svg>

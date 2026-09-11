@@ -257,3 +257,28 @@ h1, h2, h3, h4, h5, h6 {
     background-position: 200% center;
   }
 }
+
+/* Bento Remedy Cards & Query Mode Enhancements */
+.bento-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(72, 99, 59, 0.08);
+}
+
+.symptom-chip {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.symptom-chip:active {
+  transform: scale(0.96);
+}
+
+@media (max-width: 768px) {
+  .bento-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

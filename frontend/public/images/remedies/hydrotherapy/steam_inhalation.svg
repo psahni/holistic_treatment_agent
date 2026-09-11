@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="steamBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0FDFA"/>
+      <stop offset="1" stop-color="#CCFBF1"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#steamBg)"/>
+
+  <!-- Steaming Inhalation Bowl -->
+  <ellipse cx="160" cy="142" rx="55" ry="10" fill="#99F6E4" opacity="0.6"/>
+  <path d="M110 95H210L195 138C195 142 180 145 160 145C140 145 125 142 125 138L110 95Z" fill="#FFFFFF" stroke="#0D9488" stroke-width="2.5"/>
+  <ellipse cx="160" cy="95" rx="50" ry="8" fill="#5EEAD4" stroke="#0D9488" stroke-width="2"/>
+
+  <!-- Eucalyptus / Mint Leaves floating in bowl -->
+  <ellipse cx="145" cy="95" rx="8" ry="4" transform="rotate(-20 145 95)" fill="#0F766E"/>
+  <ellipse cx="175" cy="96" rx="8" ry="4" transform="rotate(25 175 96)" fill="#115E59"/>
+
+  <!-- Billowing Steam Plumes -->
+  <path d="M140 85C130 65 150 45 140 25" stroke="#14B8A6" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <path d="M160 82C150 58 170 38 160 18" stroke="#0D9488" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+  <path d="M180 85C170 65 190 45 180 25" stroke="#14B8A6" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+
+  <text x="160" y="165" text-anchor="middle" font-family="'Inter', sans-serif" font-size="11" font-weight="600" fill="#115E59" letter-spacing="1">HERBAL STEAM INHALATION THERAPY</text>
+</svg>

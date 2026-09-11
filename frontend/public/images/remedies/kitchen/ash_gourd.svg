@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="ashBg" x1="0" y1="0" x2="320" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2F8F1"/>
+      <stop offset="1" stop-color="#DEEBD9"/>
+    </linearGradient>
+    <linearGradient id="juiceGrad" x1="160" y1="80" x2="160" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DCFCE7"/>
+      <stop offset="1" stop-color="#86EFAC"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="16" fill="url(#ashBg)"/>
+
+  <!-- Ash Gourd Slice -->
+  <ellipse cx="105" cy="115" rx="35" ry="30" fill="#F0FDF4" stroke="#48633B" stroke-width="4"/>
+  <ellipse cx="105" cy="115" rx="20" ry="18" fill="#DCFCE7"/>
+  <!-- Seeds inside slice -->
+  <ellipse cx="100" cy="112" rx="3" ry="1.5" transform="rotate(-30 100 112)" fill="#8D6E63"/>
+  <ellipse cx="110" cy="118" rx="3" ry="1.5" transform="rotate(20 110 118)" fill="#8D6E63"/>
+  <ellipse cx="105" cy="122" rx="3" ry="1.5" transform="rotate(80 105 122)" fill="#8D6E63"/>
+
+  <!-- Tall Juice Glass -->
+  <ellipse cx="195" cy="150" rx="25" ry="5" fill="#BFD7B8" opacity="0.6"/>
+  <path d="M175 65H215L210 145C210 148 203 150 195 150C187 150 180 148 180 145L175 65Z" fill="#FFFFFF" fill-opacity="0.8" stroke="#A7C7A1" stroke-width="2"/>
+  
+  <!-- Green Fresh Juice -->
+  <path d="M176 80H214L209 144C209 146 203 148 195 148C187 148 181 146 181 144L176 80Z" fill="url(#juiceGrad)" fill-opacity="0.85"/>
+  <ellipse cx="195" cy="80" rx="19" ry="3.5" fill="#BBF7D0"/>
+
+  <!-- Mint sprig on top -->
+  <path d="M195 76C190 70 182 72 184 78C189 79 194 77 195 76Z" fill="#16A34A"/>
+  <path d="M195 76C200 68 208 70 206 76C201 78 196 77 195 76Z" fill="#15803D"/>
+
+  <!-- Label text -->
+  <text x="160" y="168" text-anchor="middle" font-family="'Inter', sans-serif" font-size="11" font-weight="600" fill="#48633B" letter-spacing="1">ALKALINE ASH GOURD DETOX</text>
+</svg>

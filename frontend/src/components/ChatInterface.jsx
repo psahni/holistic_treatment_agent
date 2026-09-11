@@ -10,6 +10,9 @@ import RecommendationCard from './RecommendationCard';
 import SafetyAlert from './SafetyAlert';
 import Loader from './Loader';
 import AuthModal from './AuthModal';
+import BentoRemedyGrid from './BentoRemedyGrid';
+import SymptomChips from './SymptomChips';
+import { parseRemedyContent } from '../lib/parseRemedyContent';
 
 export default function ChatInterface({ sessionId, user }) {
   const router = useRouter();
@@ -209,10 +212,11 @@ export default function ChatInterface({ sessionId, user }) {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping, isComplete]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (customMessage = null) => {
+    const textToSend = customMessage !== null ? customMessage : input;
+    if (!textToSend?.trim()) return;
     
-    const userMessage = input.trim();
+    const userMessage = textToSend.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
@@ -613,67 +617,89 @@ export default function ChatInterface({ sessionId, user }) {
               )}
             </motion.div>
           ) : (
-            messages.map((msg, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{
-                  display: 'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  alignItems: 'flex-end',
-                  gap: '0.5rem'
-                }}
-              >
-                {msg.role === 'assistant' && (
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Leaf size={20} color="var(--cream)" />
-                  </div>
-                )}
-                
-                <div 
-                  data-testid={msg.role === 'assistant' ? "assistant-message" : "user-message"}
-                  style={{
-                    maxWidth: '70%',
-                    padding: '1rem 1.5rem',
-                    borderRadius: '1.5rem',
-                    borderBottomLeftRadius: msg.role === 'assistant' ? 0 : '1.5rem',
-                    borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
-                    background: msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)',
-                    color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
-                    boxShadow: 'var(--shadow-sm)',
-                    lineHeight: 1.5
-                }}>
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
-                      ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                      ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
-                      li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
-                      strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
+            <>
+              {messages.map((msg, idx) => {
+                const isAssistant = msg.role === 'assistant';
+                const parsedRemedy = isAssistant ? parseRemedyContent(msg.content) : null;
+                const isStructuredBento = Boolean(parsedRemedy && parsedRemedy.isStructured);
+
+                return (
+                  <motion.div 
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      display: 'flex',
+                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      alignItems: 'flex-start',
+                      gap: '0.5rem',
+                      width: '100%'
                     }}
                   >
-                    {msg.content}
-                  </ReactMarkdown>
-                  {msg.role === 'assistant' && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && (
-                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
-                      <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-                        To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
-                      </p>
-                      <button 
-                        data-testid="switch-to-treatment-btn"
-                        onClick={() => setShowTransitionPrompt(true)}
-                        className="btn btn-primary"
-                        style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        🏥 Switch to Full Treatment Mode
-                      </button>
+                    {isAssistant && (
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--forest)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '4px' }}>
+                        <Leaf size={20} color="var(--cream)" />
+                      </div>
+                    )}
+                    
+                    <div 
+                      data-testid={isAssistant ? "assistant-message" : "user-message"}
+                      style={{
+                        maxWidth: isStructuredBento ? '95%' : '75%',
+                        width: isStructuredBento ? '100%' : 'auto',
+                        padding: isStructuredBento ? '0' : '1rem 1.5rem',
+                        borderRadius: isStructuredBento ? '20px' : '1.5rem',
+                        borderBottomLeftRadius: isAssistant ? 0 : '1.5rem',
+                        borderBottomRightRadius: msg.role === 'user' ? 0 : '1.5rem',
+                        background: isStructuredBento ? 'transparent' : (msg.role === 'user' ? 'var(--gold-light)' : 'rgba(255,255,255,0.8)'),
+                        color: msg.role === 'user' ? 'var(--forest-dark)' : 'var(--text-primary)',
+                        boxShadow: isStructuredBento ? 'none' : 'var(--shadow-sm)',
+                        lineHeight: 1.5
+                    }}>
+                      {isStructuredBento ? (
+                        <BentoRemedyGrid 
+                          data={parsedRemedy} 
+                          onConsultDoctor={() => setShowTransitionPrompt(true)} 
+                        />
+                      ) : (
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({node, ...props}) => <p style={{ margin: '0 0 0.5rem 0' }} {...props} />,
+                            ul: ({node, ...props}) => <ul style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                            ol: ({node, ...props}) => <ol style={{ paddingLeft: '1.5rem', margin: '0.5rem 0' }} {...props} />,
+                            li: ({node, ...props}) => <li style={{ marginBottom: '0.25rem' }} {...props} />,
+                            strong: ({node, ...props}) => <strong style={{ fontWeight: 600, color: 'var(--primary-green)' }} {...props} />
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      )}
+
+                      {isAssistant && idx === messages.length - 1 && suggestedModeSwitch && !isComplete && !isStructuredBento && (
+                        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--sage)', textAlign: 'left' }}>
+                          <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
+                            To compile a specialized clinical treatment plan and receive a verified prescription from our practitioner, please proceed to Treatment Mode.
+                          </p>
+                          <button 
+                            data-testid="switch-to-treatment-btn"
+                            onClick={() => setShowTransitionPrompt(true)}
+                            className="btn btn-primary"
+                            style={{ padding: '8px 16px', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            🏥 Switch to Full Treatment Mode
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            ))
+                  </motion.div>
+                );
+              })}
+
+              {messages.length <= 1 && mode === 'question' && !isTyping && !isComplete && (
+                <SymptomChips onSelectSymptom={(query) => handleSend(query)} />
+              )}
+            </>
           )}
           
           {isTyping && (
