@@ -66,4 +66,47 @@ describe('ChatInterface Component', () => {
       expect(naturopathyAPI.sendMessage).toHaveBeenCalledWith('test-session-123', 'I have severe acid reflux and stomach bloating after meals. What natural remedies do you suggest?', 'question');
     });
   });
+
+  test('renders assessment intake form with autofill button in treatment mode', async () => {
+    render(<ChatInterface sessionId="test-session-123" user={{ name: 'Test User' }} initialMode="treatment" />);
+
+    expect(screen.getByText(/Comprehensive Health Intake/i)).toBeInTheDocument();
+    expect(screen.getByText(/✨ Autofill Details/i)).toBeInTheDocument();
+  });
+
+  test('autofills intake form details and persists to localStorage', async () => {
+    localStorage.clear();
+    render(<ChatInterface sessionId="test-session-123" user={{ name: 'Test User' }} initialMode="treatment" />);
+
+    const autofillBtn = screen.getByText(/✨ Autofill Details/i);
+    fireEvent.click(autofillBtn);
+
+    expect(screen.getByDisplayValue(/Chronic acid reflux, burning sensation/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/About 6 months/i)).toBeInTheDocument();
+    expect(screen.getByText(/Saved in browser memory/i)).toBeInTheDocument();
+
+    const saved = JSON.parse(localStorage.getItem('naturecure_intake_draft'));
+    expect(saved.response_1).toContain('Chronic acid reflux');
+  });
+
+  test('hydrates intake form draft from localStorage on mount in treatment mode', async () => {
+    const draft = {
+      response_1: 'Persistent lower back pain',
+      response_2: '3 months',
+      response_3: '7',
+      response_4: 'Sciatica',
+      response_5: 'None',
+      response_6: 'Normal',
+      response_7: 'Moderate stress',
+      response_8: 'No allergies'
+    };
+    localStorage.setItem('naturecure_intake_draft', JSON.stringify(draft));
+
+    render(<ChatInterface sessionId="test-session-123" user={{ name: 'Test User' }} initialMode="treatment" />);
+
+    expect(screen.getByDisplayValue('Persistent lower back pain')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('3 months')).toBeInTheDocument();
+    expect(screen.getByText(/Saved in browser memory/i)).toBeInTheDocument();
+  });
 });
+

@@ -14,7 +14,7 @@ import BentoRemedyGrid from './BentoRemedyGrid';
 import SymptomChips from './SymptomChips';
 import { parseRemedyContent } from '../lib/parseRemedyContent';
 
-export default function ChatInterface({ sessionId, user }) {
+export default function ChatInterface({ sessionId, user, initialMode = 'question' }) {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(sessionId !== 'new' ? sessionId : null);
@@ -27,7 +27,7 @@ export default function ChatInterface({ sessionId, user }) {
   const [needsPractitioner, setNeedsPractitioner] = useState(false);
   
   // Custom states for Treatment Mode & Auth Gating
-  const [mode, setMode] = useState('question');
+  const [mode, setMode] = useState(initialMode);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showTransitionPrompt, setShowTransitionPrompt] = useState(false);
@@ -49,6 +49,8 @@ export default function ChatInterface({ sessionId, user }) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formStep, setFormStep] = useState(1);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [autofillNotice, setAutofillNotice] = useState('');
   
   const endOfMessagesRef = useRef(null);
   const lastTurnRef = useRef(null);
@@ -64,7 +66,77 @@ export default function ChatInterface({ sessionId, user }) {
     if (user?.loggedInUser) {
       setCurrentUser(user.loggedInUser);
     }
+
+    // Hydrate assessment form draft from browser localStorage
+    try {
+      const savedDraft = localStorage.getItem('naturecure_intake_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && typeof parsed === 'object') {
+          const hasContent = Object.entries(parsed).some(([k, v]) => k !== 'response_3' && typeof v === 'string' && v.trim());
+          if (hasContent) {
+            setFormResponses(prev => ({ ...prev, ...parsed }));
+            setHasSavedDraft(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load saved intake draft:', e);
+    }
   }, []);
+
+  const updateFormResponse = (field, value) => {
+    setFormResponses(prev => {
+      const next = { ...prev, [field]: value };
+      try {
+        localStorage.setItem('naturecure_intake_draft', JSON.stringify(next));
+        setHasSavedDraft(true);
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleAutofillIntake = () => {
+    const sample = {
+      response_1: 'Chronic acid reflux, burning sensation in upper chest, and stomach bloating after meals.',
+      response_2: 'About 6 months, worsening with work stress and late dinners',
+      response_3: '6',
+      response_4: 'Mild seasonal pollen allergies. No history of hypertension, surgeries, or cardiac issues.',
+      response_5: 'Occasional calcium antacids, daily Vitamin B-complex.',
+      response_6: 'Vegetarian diet, irregular dinner timings, high tea intake and evening fried snacks.',
+      response_7: '6 hours disturbed sleep, desk-bound sedentary office job, moderate daily stress.',
+      response_8: 'Pollen and dust allergies. Not pregnant.'
+    };
+    setFormResponses(sample);
+    setFormError('');
+    setAutofillNotice('Sample assessment details autofilled & saved to browser memory!');
+    try {
+      localStorage.setItem('naturecure_intake_draft', JSON.stringify(sample));
+      setHasSavedDraft(true);
+    } catch (e) {}
+    setTimeout(() => setAutofillNotice(''), 3000);
+  };
+
+  const handleClearIntake = () => {
+    const empty = {
+      response_1: '',
+      response_2: '',
+      response_3: '5',
+      response_4: '',
+      response_5: '',
+      response_6: '',
+      response_7: '',
+      response_8: ''
+    };
+    setFormResponses(empty);
+    setFormError('');
+    setAutofillNotice('Assessment form cleared.');
+    try {
+      localStorage.removeItem('naturecure_intake_draft');
+      setHasSavedDraft(false);
+    } catch (e) {}
+    setTimeout(() => setAutofillNotice(''), 2500);
+  };
 
   const checkCaseReviewStatus = async () => {
     if (!activeSessionId) return;
@@ -303,14 +375,73 @@ export default function ChatInterface({ sessionId, user }) {
                 width: '100%'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem' }}>
-                <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'Playfair Display, serif', fontSize: '1.75rem' }}>
-                  📋 Comprehensive Health Intake
-                </h3>
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--forest)', background: 'var(--cream)', padding: '6px 12px', borderRadius: '20px' }}>
-                  Step {formStep} of 3
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ color: 'var(--forest-dark)', margin: 0, fontFamily: 'Playfair Display, serif', fontSize: '1.75rem' }}>
+                    📋 Comprehensive Health Intake
+                  </h3>
+                  {hasSavedDraft && (
+                    <span style={{ fontSize: '0.75rem', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span>
+                      Saved in browser memory
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleAutofillIntake}
+                    title="Autofill realistic sample assessment details"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      background: 'var(--cream)',
+                      border: '1.5px solid var(--forest)',
+                      color: 'var(--forest)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    ✨ Autofill Details
+                  </button>
+                  {hasSavedDraft && (
+                    <button
+                      type="button"
+                      onClick={handleClearIntake}
+                      title="Clear form inputs"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '6px 10px',
+                        borderRadius: '20px',
+                        background: 'transparent',
+                        border: '1px solid var(--cream-dark)',
+                        color: 'var(--text-light)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🗑️ Clear
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--forest)', background: 'var(--cream)', padding: '6px 12px', borderRadius: '20px' }}>
+                    Step {formStep} of 3
+                  </span>
+                </div>
               </div>
+
+              {autofillNotice && (
+                <div style={{ padding: '0.6rem 1rem', backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '6px', marginBottom: '1.25rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>✓</span> {autofillNotice}
+                </div>
+              )}
 
               {/* Progress Bar indicator */}
               <div style={{ width: '100%', height: '4px', background: 'var(--cream-dark)', borderRadius: '2px', marginBottom: '2rem', overflow: 'hidden' }}>
@@ -337,7 +468,7 @@ export default function ChatInterface({ sessionId, user }) {
                       placeholder="Describe your primary complaint (e.g. chronic bloating, fatigue, skin rashes)..."
                       required
                       value={formResponses.response_1}
-                      onChange={e => setFormResponses({ ...formResponses, response_1: e.target.value })}
+                      onChange={e => updateFormResponse('response_1', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -353,7 +484,7 @@ export default function ChatInterface({ sessionId, user }) {
                         placeholder="e.g. 5 years, 3 months"
                         required
                         value={formResponses.response_2}
-                        onChange={e => setFormResponses({ ...formResponses, response_2: e.target.value })}
+                        onChange={e => updateFormResponse('response_2', e.target.value)}
                         style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                       />
                     </div>
@@ -367,7 +498,7 @@ export default function ChatInterface({ sessionId, user }) {
                           min="1"
                           max="10"
                           value={formResponses.response_3}
-                          onChange={e => setFormResponses({ ...formResponses, response_3: e.target.value })}
+                          onChange={e => updateFormResponse('response_3', e.target.value)}
                           style={{ flex: 1, accentColor: 'var(--forest)' }}
                         />
                         <span style={{ fontWeight: 'bold', minWidth: '24px', textAlign: 'center', background: 'var(--cream)', padding: '4px 8px', borderRadius: '4px' }}>
@@ -386,7 +517,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="List allergies or check if pregnant (write 'None' if not applicable)..."
                       value={formResponses.response_8}
-                      onChange={e => setFormResponses({ ...formResponses, response_8: e.target.value })}
+                      onChange={e => updateFormResponse('response_8', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -423,7 +554,7 @@ export default function ChatInterface({ sessionId, user }) {
                       placeholder="Any past diagnoses or existing conditions (e.g. hypothyroidism, hypertension, diabetes)..."
                       required
                       value={formResponses.response_4}
-                      onChange={e => setFormResponses({ ...formResponses, response_4: e.target.value })}
+                      onChange={e => updateFormResponse('response_4', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -437,7 +568,7 @@ export default function ChatInterface({ sessionId, user }) {
                       rows="2"
                       placeholder="List any ongoing medications, thyroid supplements, or vitamins..."
                       value={formResponses.response_5}
-                      onChange={e => setFormResponses({ ...formResponses, response_5: e.target.value })}
+                      onChange={e => updateFormResponse('response_5', e.target.value)}
                       style={{ resize: 'vertical', width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -451,7 +582,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="e.g. vegetarian, high-protein, normal appetite, water intake..."
                       value={formResponses.response_6}
-                      onChange={e => setFormResponses({ ...formResponses, response_6: e.target.value })}
+                      onChange={e => updateFormResponse('response_6', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
@@ -465,7 +596,7 @@ export default function ChatInterface({ sessionId, user }) {
                       className="form-input"
                       placeholder="e.g. 6 hours sleep, moderate stress, sedentary job..."
                       value={formResponses.response_7}
-                      onChange={e => setFormResponses({ ...formResponses, response_7: e.target.value })}
+                      onChange={e => updateFormResponse('response_7', e.target.value)}
                       style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cream-dark)' }}
                     />
                   </div>
