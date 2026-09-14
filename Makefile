@@ -1,6 +1,6 @@
 # 🌿 NatureCure AI — Makefile
 
-.PHONY: start stop start-backend start-frontend ingest seed test help
+.PHONY: start stop start-backend start-frontend ingest seed test eval help
 
 help:
 	@echo "NatureCure AI Management Commands:"
@@ -10,7 +10,8 @@ help:
 	@echo "  make start-frontend- Start Next.js frontend only (http://localhost:3000)"
 	@echo "  make ingest        - Parse & index PDF books from backend/data/docs into Qdrant"
 	@echo "  make seed          - Seed initial Naturopathy KB into Qdrant vector store"
-	@echo "  make test          - Run safety & quality test suite (pytest)"
+	@echo "  make test          - Run fast safety & guardrail test suite (<1s)"
+	@echo "  make eval          - Run full DeepEval LLM quality & clinical benchmark"
 
 start:
 	@echo "🚀 Starting n NatureCure AI Servers..."
@@ -37,5 +38,9 @@ seed:
 	cd backend && python seed_kb_to_qdrant.py
 
 test:
-	@echo "🧪 Running Safety & Quality Eval Suite..."
+	@echo "🧪 Running Fast Safety & Guardrail Suite (<1s)..."
+	cd backend && python -m pytest evals/test_naturopathy_evals.py -k "not Quality" -v
+
+eval:
+	@echo "🧠 Running Full DeepEval Clinical Quality Eval Suite..."
 	cd backend && python -m pytest evals/ -v

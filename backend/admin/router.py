@@ -463,8 +463,11 @@ async def generate_ai_prescription(session_id: str, req: GenerateAIPrescriptionR
     state = session_store.get_session(session_id)
     if not state:
         # Try loading from DB
-        session_uuid = uuid.UUID(session_id)
-        session = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+        try:
+            session_uuid = uuid.UUID(session_id)
+            session = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
+        except ValueError:
+            session = None
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         # Reconstruct minimal state from DB

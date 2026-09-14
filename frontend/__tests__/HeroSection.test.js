@@ -1,29 +1,48 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import HeroSection from '../src/components/HeroSection';
+import { naturopathyAPI } from '../src/services/api';
+
+jest.mock('../src/services/api', () => ({
+  naturopathyAPI: {
+    getMe: jest.fn(),
+    logout: jest.fn(),
+  },
+}));
 
 describe('HeroSection Component', () => {
-  test('renders hero title and subtitle', () => {
-    render(<HeroSection onStartAssessment={() => {}} />);
-    expect(screen.getByText(/AI-Powered Holistic/i)).toBeInTheDocument();
-    expect(screen.getByText(/Begin your wellness journey/i)).toBeInTheDocument();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    naturopathyAPI.getMe.mockRejectedValue(new Error('Unauthenticated'));
   });
 
-  test('calls onStartAssessment when getting started is clicked', () => {
-    const onStart = jest.fn();
-    render(<HeroSection onStartAssessment={onStart} />);
-    
-    // There are multiple Get Started buttons (mobile and desktop)
-    const buttons = screen.getAllByRole('button', { name: /Get Started/i });
-    fireEvent.click(buttons[0]);
-    expect(onStart).toHaveBeenCalled();
+  test('renders hero title and subtitle', async () => {
+    render(<HeroSection onStart={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByText(/AI-Powered Holistic Healing/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Natural Healing\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Personalized for You\./i)).toBeInTheDocument();
   });
 
-  test('changes treatment mode selection', () => {
-    render(<HeroSection onStartAssessment={() => {}} />);
-    // Select the "Ask Questions First" mode
-    const questionModeBtn = screen.getByText(/Ask Questions First/i);
-    fireEvent.click(questionModeBtn);
-    // Button should be active (we could check class name if we knew it, but just clicking is enough for coverage)
+  test('opens patient modal when unauthenticated user starts journey', async () => {
+    render(<HeroSection onStart={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Start Your Healing Journey/i })).toBeInTheDocument();
+    });
+    const startBtn = screen.getByRole('button', { name: /Start Your Healing Journey/i });
+    fireEvent.click(startBtn);
+    expect(screen.getByRole('button', { name: /Begin Your Assessment/i })).toBeInTheDocument();
+  });
+
+  test('opens auth modal when clicking log in / sign up', async () => {
+    render(<HeroSection onStart={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Log In \/ Sign Up/i })).toBeInTheDocument();
+    });
+    const authBtn = screen.getByRole('button', { name: /Log In \/ Sign Up/i });
+    fireEvent.click(authBtn);
+    expect(screen.getByRole('heading', { name: /Welcome Back/i })).toBeInTheDocument();
   });
 });
+

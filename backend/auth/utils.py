@@ -1,6 +1,7 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import jwt
+import uuid
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from config import get_settings
@@ -55,7 +56,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             detail="Could not validate credentials",
         )
         
-    user = db.query(User).filter(User.id == user_id).first()
+    try:
+        user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+        
+    user = db.query(User).filter(User.id == user_uuid).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,7 +88,8 @@ def get_optional_current_user(request: Request, db: Session = Depends(get_db)):
         user_id: str = payload.get("sub")
         if user_id is None:
             return None
-        user = db.query(User).filter(User.id == user_id).first()
+        user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        user = db.query(User).filter(User.id == user_uuid).first()
         return user
     except Exception:
         return None
