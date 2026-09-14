@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # --- Google Cloud / Gemini ---
-    GCP_PROJECT: str
+    GCP_PROJECT: str = ""
     GCP_LOCATION: str = "us-central1"
     USE_VERTEX_AI: bool = False       # True = Vertex AI (ADC auth, higher quotas); False = Gemini API key
     GEMINI_API_KEY: str = ""          # Only required when USE_VERTEX_AI=False
