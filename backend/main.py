@@ -38,13 +38,18 @@ from admin.router import router as admin_router
 app.include_router(auth_router)
 app.include_router(admin_router, prefix="/api/admin")
 
+cors_origins = set(settings.CORS_ORIGINS) if isinstance(settings.CORS_ORIGINS, list) else set()
+cors_origins.update([
+    "http://localhost:5173", 
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=list(cors_origins),
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
