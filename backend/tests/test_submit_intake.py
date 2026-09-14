@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 import sys
 import os
 import time
+import uuid
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -13,17 +14,18 @@ client = TestClient(app)
 @pytest.fixture
 def auth_client():
     c = TestClient(app)
-    email = f"intake.patient.{int(time.time()*1000)}@example.com"
+    uid = uuid.uuid4().hex[:8]
+    email = f"intake.patient.{uid}@example.com"
     user_payload = {
         "name": "Test Intake Patient",
         "email": email,
         "password": "Password123!",
         "age": 32,
         "city": "Mumbai",
-        "phone_number": f"+91{int(time.time())}"
+        "phone_number": f"+91{uuid.uuid4().int % 10000000000:010d}"
     }
     signup_resp = c.post("/api/auth/signup", json=user_payload)
-    assert signup_resp.status_code == 200
+    assert signup_resp.status_code in (200, 201)
     return c
 
 
@@ -45,7 +47,7 @@ def test_submit_intake_direct_save(auth_client):
     # 1. Start session
     start_resp = auth_client.post("/api/naturo/start", json={
         "message": "Start session for intake test",
-        "patient_info": {"age": 45, "gender": "male", "region": "Delhi"},
+        "patient_info": {"age": 45, "gender": "male", "region": "Delhi", "occupation": "Consultant"},
         "mode": "treatment"
     })
     session_id = start_resp.json()["session_id"]

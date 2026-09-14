@@ -250,22 +250,38 @@ def save_completed_session(db, session_id: str, user_id: str, state: dict):
         session = db.query(ConsultationSession).filter(ConsultationSession.id == session_uuid).first()
         if not session:
             conv_history = state.get("conversation_history", [])
-            
-            session = ConsultationSession(
-                id=session_uuid,
-                patient_id=profile.id,
-                user_id=user_uuid,
-                session_data=conv_history,
-                root_causes=state.get("root_causes", []),
-                protocols_recommended=state.get("final_report", {}),
-                completed_at=datetime.now(timezone.utc),
-                need_practitioner=state.get("need_practitioner", False),
-                status="pending_review",
-                investigations=state.get("patient_info", {}).get("investigations", "")
-            )
+            kwargs = {
+                "id": session_uuid,
+                "patient_id": profile.id,
+                "user_id": user_uuid,
+                "session_data": conv_history,
+                "root_causes": state.get("root_causes", []),
+                "protocols_recommended": state.get("final_report", {}),
+                "completed_at": datetime.now(timezone.utc),
+                "need_practitioner": state.get("need_practitioner", False),
+                "status": "pending_review",
+                "investigations": state.get("patient_info", {}).get("investigations", "")
+            }
+            bind = db.get_bind()
+            if bind and bind.dialect.name == "sqlite":
+                from sqlalchemy import func
+                max_id = db.query(func.max(ConsultationSession.case_id)).scalar() or 0
+                kwargs["case_id"] = max_id + 1
+
+            session = ConsultationSession(**kwargs)
             db.add(session)
             db.commit()
+            db.refresh(session)
             logger.info(f"Successfully saved completed session {session_id} to DB")
+        else:
+            if not session.case_id:
+                bind = db.get_bind()
+                if bind and bind.dialect.name == "sqlite":
+                    from sqlalchemy import func
+                    max_id = db.query(func.max(ConsultationSession.case_id)).scalar() or 0
+                    session.case_id = max_id + 1
+                    db.commit()
+                    db.refresh(session)
         return session
     except Exception as e:
         logger.error(f"Error saving completed session to DB: {e}", exc_info=True)

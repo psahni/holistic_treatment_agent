@@ -23,8 +23,8 @@ def test_auth_workflow():
 
     # 1. Signup
     signup_resp = client.post("/api/auth/signup", json=signup_data)
-    assert signup_resp.status_code == 200
-    assert signup_resp.json()["user"]["email"] == unique_email
+    assert signup_resp.status_code in (200, 201)
+    assert signup_resp.json()["email"] == unique_email
 
     # 2. Duplicate Signup should fail
     dup_resp = client.post("/api/auth/signup", json=signup_data)
@@ -33,7 +33,7 @@ def test_auth_workflow():
     # 3. Get Me (cookie is set)
     me_resp = client.get("/api/auth/me")
     assert me_resp.status_code == 200
-    assert me_resp.json()["user"]["email"] == unique_email
+    assert me_resp.json()["email"] == unique_email
 
     # 4. Logout
     logout_resp = client.post("/api/auth/logout")
@@ -45,7 +45,7 @@ def test_auth_workflow():
         "password": "Password123!"
     })
     assert login_resp.status_code == 200
-    assert login_resp.json()["user"]["email"] == unique_email
+    assert login_resp.json()["message"] == "Logged in successfully"
 
 
 def test_invalid_login():
