@@ -45,22 +45,35 @@ def setup_llm_cache():
         logger.info(f"LLM Caching enabled via Redis at {settings.REDIS_URL} (ttl={ttl})")
     except Exception as e:
         # Fallback to InMemoryCache if Redis fails
-        from langchain_core.globals import set_llm_cache
-        from langchain_community.cache import InMemoryCache
-        set_llm_cache(InMemoryCache())
-        logger.warning(f"Failed to connect to Redis for LLM cache ({e}). Falling back to InMemoryCache.")
+        try:
+            from langchain_core.globals import set_llm_cache
+            from langchain_community.cache import InMemoryCache
+            set_llm_cache(InMemoryCache())
+            logger.warning(f"Failed to connect to Redis for LLM cache ({e}). Falling back to InMemoryCache.")
+        except Exception as cache_err:
+            logger.warning(f"Could not initialize LLM cache ({cache_err}). Proceeding without LLM cache.")
         
     _cache_initialized = True
 
 def get_llm():
     setup_llm_cache()
-    return ChatVertexAI(
-        model_name=settings.GEMINI_MODEL,
-        temperature=settings.TEMPERATURE,
-        max_tokens=settings.MAX_TOKENS,
-        project=settings.GCP_PROJECT,
-        max_retries=5
-    )
+    if settings.USE_VERTEX_AI:
+        return ChatVertexAI(
+            model_name=settings.GEMINI_MODEL,
+            temperature=settings.TEMPERATURE,
+            max_tokens=settings.MAX_TOKENS,
+            project=settings.GCP_PROJECT,
+            max_retries=5
+        )
+    else:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=settings.GEMINI_MODEL,
+            temperature=settings.TEMPERATURE,
+            max_output_tokens=settings.MAX_TOKENS,
+            google_api_key=settings.GEMINI_API_KEY,
+            max_retries=5
+        )
 
 def intake_node(state: NaturopathyState) -> NaturopathyState:
     llm = get_llm()
