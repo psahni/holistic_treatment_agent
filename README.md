@@ -107,6 +107,19 @@ make stop
 
 ---
 
+## 🌐 Zero-Cost Cloud Deployment
+
+Deploy both frontend and backend to production for **$0 / month** using free cloud services:
+* **Frontend**: [Vercel](https://vercel.com) (Next.js Edge Hosting)
+* **Backend**: [Render](https://render.com) (FastAPI Web Service)
+* **Database**: [Neon](https://neon.tech) (Managed Serverless PostgreSQL)
+* **Vector Store**: [Qdrant Cloud](https://cloud.qdrant.io) (1GB Free Cluster)
+* **LLM & Embeddings**: [Google AI Studio](https://aistudio.google.com) (Gemini 2.0 Flash)
+
+👉 **For the complete step-by-step guide, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)**
+
+---
+
 ## 🏗️ Architecture
 
 ```
