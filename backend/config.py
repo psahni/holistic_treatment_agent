@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     GCP_LOCATION: str = "us-central1"
     USE_VERTEX_AI: bool = False       # True = Vertex AI (ADC auth, higher quotas); False = Gemini API key
     GEMINI_API_KEY: str = ""          # Only required when USE_VERTEX_AI=False
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-3.6-flash"
     MAX_TOKENS: int = 8192
     TEMPERATURE: float = 0.3
     

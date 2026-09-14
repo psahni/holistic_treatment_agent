@@ -67,13 +67,35 @@ def get_llm():
         )
     else:
         from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(
-            model=settings.GEMINI_MODEL,
-            temperature=settings.TEMPERATURE,
-            max_output_tokens=settings.MAX_TOKENS,
-            google_api_key=settings.GEMINI_API_KEY,
-            max_retries=5
-        )
+        
+        # Primary model and resilient fallback candidates
+        candidate_models = [
+            settings.GEMINI_MODEL,
+            "gemini-3.6-flash",
+            "gemini-2.5-flash",
+            "gemini-1.5-flash"
+        ]
+        # Filter out empty or duplicate model names while preserving order
+        unique_models = []
+        for m in candidate_models:
+            if m and m not in unique_models:
+                unique_models.append(m)
+                
+        instances = [
+            ChatGoogleGenerativeAI(
+                model=m,
+                temperature=settings.TEMPERATURE,
+                max_output_tokens=settings.MAX_TOKENS,
+                google_api_key=settings.GEMINI_API_KEY,
+                max_retries=2
+            )
+            for m in unique_models
+        ]
+        
+        primary = instances[0]
+        if len(instances) > 1:
+            return primary.with_fallbacks(instances[1:])
+        return primary
 
 def intake_node(state: NaturopathyState) -> NaturopathyState:
     llm = get_llm()
