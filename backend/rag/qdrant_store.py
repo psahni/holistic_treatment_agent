@@ -76,16 +76,13 @@ def get_qdrant_client() -> QdrantClient:
                 _client = QdrantClient(path=local_db_path)
             except Exception as e:
                 if "lock" in str(e).lower() or "locked" in str(e).lower():
-                    logger.critical(
-                        "\n" + "="*80 + "\n"
-                        "CRITICAL ERROR: Local Qdrant Database is Locked!\n\n"
-                        "This usually happens because another python process (like your active FastAPI server)\n"
-                        "is already connected to the embedded Qdrant DB file in backend/data/qdrant_db.\n\n"
-                        "Fix: Please stop the running FastAPI server/Uvicorn before running this script,\n"
-                        "or run Qdrant inside a Docker container (using QDRANT_URL in .env) to allow concurrent processes.\n"
-                        + "="*80 + "\n"
+                    logger.warning(
+                        "Local Qdrant Database is locked by another process (e.g. running FastAPI/Uvicorn server). "
+                        "Falling back to in-memory Qdrant storage (:memory:) to ensure agent stability."
                     )
-                raise e
+                    _client = QdrantClient(location=":memory:")
+                else:
+                    raise e
 
     ensure_collection_exists(_client)
     return _client
