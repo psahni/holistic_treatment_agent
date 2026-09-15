@@ -57,9 +57,10 @@ def setup_llm_cache():
 
 def normalize_llm_content(content: Any) -> str:
     """Safely extracts a single clean string from LLM response.content (str, list of strings, or list of dicts)."""
+    text = ""
     if isinstance(content, str):
-        return content
-    if isinstance(content, list):
+        text = content
+    elif isinstance(content, list):
         parts = []
         for item in content:
             if isinstance(item, str):
@@ -68,8 +69,12 @@ def normalize_llm_content(content: Any) -> str:
                 parts.append(str(item.get("text", item)))
             else:
                 parts.append(str(item))
-        return " ".join(parts).strip()
-    return str(content) if content is not None else ""
+        text = " ".join(parts).strip()
+    elif content is not None:
+        text = str(content)
+    import re
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
+    return text
 
 def get_llm():
     setup_llm_cache()
@@ -181,9 +186,43 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
                 state["recommended_mode"] = None
                 
             state["current_question"] = content
+            
+            # Generate 3 targeted follow-up questions/hints for Question Mode
+            topic = latest_user_message.lower()
+            if any(w in topic for w in ["acid", "reflux", "gerd", "bloat", "stomach", "gas", "indigestion", "digestion", "heartburn"]):
+                state["suggested_questions"] = [
+                    "What specific foods should I strictly avoid for acid reflux and bloating?",
+                    "How quickly can I expect relief by following these natural remedies?",
+                    "Are there specific yoga asanas or breathing exercises for better digestion?"
+                ]
+            elif any(w in topic for w in ["sleep", "insomnia", "tired", "wake", "night", "stress", "anxiety"]):
+                state["suggested_questions"] = [
+                    "What natural bedtime drinks or herbal teas improve deep sleep?",
+                    "How does hydrotherapy like a warm foot bath help with insomnia?",
+                    "Should I switch to Full Treatment Mode for chronic sleep issues?"
+                ]
+            elif any(w in topic for w in ["pain", "joint", "back", "knee", "headache", "migraine", "arthritis", "neck"]):
+                state["suggested_questions"] = [
+                    "Should I apply a hot or cold compress for this type of pain?",
+                    "What anti-inflammatory foods can help soothe joint stiffness?",
+                    "When is it necessary to consult an AYUSH doctor for this pain?"
+                ]
+            elif any(w in topic for w in ["skin", "rash", "eczema", "acne", "psoriasis", "itch"]):
+                state["suggested_questions"] = [
+                    "What natural blood-purifying diet helps clear skin inflammation?",
+                    "Can mud packs or cold hydrotherapy packs be applied topically?",
+                    "Are there specific herbal infusions recommended for this skin issue?"
+                ]
+            else:
+                state["suggested_questions"] = [
+                    "What specific dietary adjustments will speed up my recovery?",
+                    "How long should I practice these natural therapies daily?",
+                    "Are there any contraindications or foods I should avoid?"
+                ]
         else:
             state["current_question"] = "I apologize, I'm having trouble processing that query properly. Could you rephrase it?"
             state["recommended_mode"] = None
+            state["suggested_questions"] = []
             
         state["conversation_history"].append({"role": "agent", "content": state["current_question"]})
         

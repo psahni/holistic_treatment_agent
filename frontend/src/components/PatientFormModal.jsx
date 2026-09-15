@@ -36,20 +36,25 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
   };
 
   const handleAutofill = () => {
-    const sample = {
-      name: 'Rohan Sharma',
-      age: '32',
-      gender: 'male',
-      region: 'New Delhi, India',
-      investigations: 'Recent blood work normal; mild Vitamin D deficiency (22 ng/mL).'
-    };
-    setFormData(sample);
     try {
-      localStorage.setItem('naturecure_visitor_profile', JSON.stringify(sample));
-      setHasSavedProfile(true);
-    } catch (e) {}
-    setAutofillNotice('Details autofilled!');
-    setTimeout(() => setAutofillNotice(''), 2500);
+      const saved = localStorage.getItem('naturecure_visitor_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && (parsed.name || parsed.age || parsed.region)) {
+          setFormData(prev => ({ ...prev, ...parsed }));
+          setHasSavedProfile(true);
+          setAutofillNotice('Your saved details autofilled!');
+          setTimeout(() => setAutofillNotice(''), 2500);
+          return;
+        }
+      }
+      setAutofillNotice('No saved details found yet. Please enter your details first.');
+      setTimeout(() => setAutofillNotice(''), 2500);
+    } catch (e) {
+      console.warn('Failed to load saved visitor profile:', e);
+      setAutofillNotice('Could not load saved details.');
+      setTimeout(() => setAutofillNotice(''), 2500);
+    }
   };
 
   const handleClear = () => {
@@ -59,7 +64,7 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
       localStorage.removeItem('naturecure_visitor_profile');
       setHasSavedProfile(false);
     } catch (e) {}
-    setAutofillNotice('Cleared.');
+    setAutofillNotice('Saved profile cleared.');
     setTimeout(() => setAutofillNotice(''), 2000);
   };
 
@@ -144,10 +149,12 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
           Please provide some basic information so we can personalize your holistic health journey.
         </p>
         
-        <form onSubmit={handleStart}>
+        <form onSubmit={handleStart} autoComplete="on">
           <div className="form-group">
             <input 
               type="text" 
+              name="name"
+              autoComplete="name"
               className="form-input" 
               placeholder="Name" 
               required
@@ -159,6 +166,8 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
             <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
               <input 
                 type="number" 
+                name="age"
+                autoComplete="on"
                 className="form-input" 
                 placeholder="Age" 
                 required 
@@ -168,6 +177,8 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
             </div>
             <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
               <select 
+                name="gender"
+                autoComplete="sex"
                 className="form-input" 
                 required 
                 value={formData.gender} 
@@ -183,6 +194,8 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
             <input 
               type="text" 
+              name="region"
+              autoComplete="address-level2"
               className="form-input" 
               placeholder="Region (e.g. India)" 
               required 
@@ -196,6 +209,8 @@ export default function PatientFormModal({ isOpen, onClose, onStart }) {
               Share your previous investigation results <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: '#888' }}>(Optional)</span>
             </label>
             <textarea 
+              name="investigations"
+              autoComplete="on"
               className="form-input" 
               placeholder="e.g. Recent blood tests, vitamin deficiencies, specific lab values..." 
               value={formData.investigations || ''} 

@@ -17,21 +17,35 @@ describe('PatientFormModal Component', () => {
     expect(screen.getByText(/✨ Autofill Details/i)).toBeInTheDocument();
   });
 
-  test('autofills sample details when Autofill Details button is clicked', () => {
+  test('shows notice when Autofill Details button is clicked with no saved profile', () => {
     render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={() => {}} />);
     
     const autofillBtn = screen.getByText(/✨ Autofill Details/i);
     fireEvent.click(autofillBtn);
 
-    expect(screen.getByDisplayValue('Rohan Sharma')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('32')).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toHaveValue('male');
-    expect(screen.getByDisplayValue('New Delhi, India')).toBeInTheDocument();
-    expect(screen.getByText(/Details autofilled!/i)).toBeInTheDocument();
+    expect(screen.getByText(/No saved details found yet/i)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Rohan Sharma')).not.toBeInTheDocument();
+  });
+
+  test('autofills saved details when Autofill Details button is clicked with saved profile', () => {
+    const savedData = {
+      name: 'Priya Patel',
+      age: '28',
+      gender: 'female',
+      region: 'Bangalore, India',
+      investigations: 'Iron deficiency'
+    };
+    localStorage.setItem('naturecure_visitor_profile', JSON.stringify(savedData));
+
+    render(<PatientFormModal isOpen={true} onClose={() => {}} onStart={() => {}} />);
     
-    // Check localStorage persistence
-    const saved = JSON.parse(localStorage.getItem('naturecure_visitor_profile'));
-    expect(saved.name).toBe('Rohan Sharma');
+    const autofillBtn = screen.getByText(/✨ Autofill Details/i);
+    fireEvent.click(autofillBtn);
+
+    expect(screen.getByDisplayValue('Priya Patel')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('28')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Bangalore, India')).toBeInTheDocument();
+    expect(screen.getByText(/Your saved details autofilled!/i)).toBeInTheDocument();
   });
 
   test('hydrates saved profile from localStorage on open', () => {

@@ -32,6 +32,7 @@ class AssessmentResponse(BaseModel):
     report: Optional[Dict[str, Any]] = None
     safety_flags: List[str] = []
     need_practitioner: bool = False
+    suggested_questions: List[str] = []
 
 class RootCause(BaseModel):
     cause: str

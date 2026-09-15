@@ -87,6 +87,8 @@ export function parseRemedyContent(content) {
     return { isStructured: false, rawContent: '' };
   }
 
+  // Strip any <think>...</think> reasoning blocks
+  content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   const lower = content.toLowerCase();
 
   // Markers that indicate remedy advice is present

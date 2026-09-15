@@ -60,7 +60,8 @@ class NaturopathyAgent:
             "is_complete": state.get("assessment_complete", False),
             "report": state.get("final_report") if state.get("final_report") else None,
             "safety_flags": state.get("safety_flags", []),
-            "need_practitioner": state.get("need_practitioner", False)
+            "need_practitioner": state.get("need_practitioner", False),
+            "suggested_questions": state.get("suggested_questions", [])
         }
         
     async def process_message_stream(self, session_id: str, message: str, state: dict, mode: str = None, user_id: str = None, db = None):

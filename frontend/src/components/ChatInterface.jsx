@@ -14,9 +14,49 @@ import BentoRemedyGrid from './BentoRemedyGrid';
 import SymptomChips from './SymptomChips';
 import { parseRemedyContent } from '../lib/parseRemedyContent';
 
+const GENERIC_WELCOME_MESSAGE = 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.';
+
+function deriveSampleQuestions(userMsg = '', assistantMsg = '') {
+  const combined = (userMsg + ' ' + assistantMsg).toLowerCase();
+  if (combined.includes('acid') || combined.includes('reflux') || combined.includes('gerd') || combined.includes('bloat') || combined.includes('stomach') || combined.includes('gas') || combined.includes('heartburn') || combined.includes('digest')) {
+    return [
+      "What specific foods should I strictly avoid for acid reflux and bloating?",
+      "How quickly can I expect relief by following these natural remedies?",
+      "Are there specific yoga asanas or breathing exercises for better digestion?"
+    ];
+  }
+  if (combined.includes('sleep') || combined.includes('insomnia') || combined.includes('stress') || combined.includes('tired') || combined.includes('anxiety')) {
+    return [
+      "What natural bedtime drinks or herbal teas improve deep sleep?",
+      "How does hydrotherapy like a warm foot bath help with insomnia?",
+      "Should I switch to Full Treatment Mode for chronic sleep issues?"
+    ];
+  }
+  if (combined.includes('pain') || combined.includes('joint') || combined.includes('back') || combined.includes('knee') || combined.includes('headache') || combined.includes('migraine') || combined.includes('arthritis')) {
+    return [
+      "Should I apply a hot or cold compress for this type of pain?",
+      "What anti-inflammatory foods can help soothe joint stiffness?",
+      "When is it necessary to consult an AYUSH doctor for this pain?"
+    ];
+  }
+  if (combined.includes('skin') || combined.includes('rash') || combined.includes('eczema') || combined.includes('acne') || combined.includes('itch')) {
+    return [
+      "What natural diet helps clear skin inflammation?",
+      "Can mud packs or cold hydrotherapy packs be applied topically?",
+      "Are there specific herbal infusions recommended for this skin issue?"
+    ];
+  }
+  return [
+    "What specific dietary adjustments will speed up my recovery?",
+    "How long should I practice these natural therapies daily?",
+    "Are there any precautions or foods I should avoid?"
+  ];
+}
+
 export default function ChatInterface({ sessionId, user, initialMode = 'question' }) {
   const router = useRouter();
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([{ role: 'assistant', content: GENERIC_WELCOME_MESSAGE }]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(sessionId !== 'new' ? sessionId : null);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -59,8 +99,6 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
   useEffect(() => {
     if (sessionId === 'new' && !activeSessionId) {
       startNewSession();
-    } else if (messages.length === 0) {
-      setMessages([{ role: 'assistant', content: 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.' }]);
     }
     
     if (user?.loggedInUser) {
@@ -97,24 +135,29 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
   };
 
   const handleAutofillIntake = () => {
-    const sample = {
-      response_1: 'Chronic acid reflux, burning sensation in upper chest, and stomach bloating after meals.',
-      response_2: 'About 6 months, worsening with work stress and late dinners',
-      response_3: '6',
-      response_4: 'Mild seasonal pollen allergies. No history of hypertension, surgeries, or cardiac issues.',
-      response_5: 'Occasional calcium antacids, daily Vitamin B-complex.',
-      response_6: 'Vegetarian diet, irregular dinner timings, high tea intake and evening fried snacks.',
-      response_7: '6 hours disturbed sleep, desk-bound sedentary office job, moderate daily stress.',
-      response_8: 'Pollen and dust allergies. Not pregnant.'
-    };
-    setFormResponses(sample);
-    setFormError('');
-    setAutofillNotice('Sample assessment details autofilled & saved to browser memory!');
     try {
-      localStorage.setItem('naturecure_intake_draft', JSON.stringify(sample));
-      setHasSavedDraft(true);
-    } catch (e) {}
-    setTimeout(() => setAutofillNotice(''), 3000);
+      const savedDraft = localStorage.getItem('naturecure_intake_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && typeof parsed === 'object') {
+          const hasContent = Object.entries(parsed).some(([k, v]) => k !== 'response_3' && typeof v === 'string' && v.trim());
+          if (hasContent) {
+            setFormResponses(prev => ({ ...prev, ...parsed }));
+            setFormError('');
+            setHasSavedDraft(true);
+            setAutofillNotice('Saved assessment details autofilled from browser memory!');
+            setTimeout(() => setAutofillNotice(''), 3000);
+            return;
+          }
+        }
+      }
+      setAutofillNotice('No saved assessment draft found yet. Please enter your details.');
+      setTimeout(() => setAutofillNotice(''), 3000);
+    } catch (e) {
+      console.warn('Failed to autofill intake draft:', e);
+      setAutofillNotice('Could not load saved draft.');
+      setTimeout(() => setAutofillNotice(''), 3000);
+    }
   };
 
   const handleClearIntake = () => {
@@ -172,7 +215,6 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
   }, [isComplete, currentUser]);
 
   const startNewSession = async () => {
-    setIsTyping(true);
     try {
       const response = await naturopathyAPI.startSession({
         name: user?.name || 'User',
@@ -180,17 +222,11 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
         region: user?.region || 'Not specified',
         gender: user?.gender || 'other'
       });
-      setActiveSessionId(response.session_id);
-      if (response.message) {
-        setMessages([{ role: 'assistant', content: response.message }]);
-      } else {
-        setMessages([{ role: 'assistant', content: 'Welcome to NatureCure AI. Please tell me about the main health challenge you are facing today.' }]);
+      if (response?.session_id) {
+        setActiveSessionId(response.session_id);
       }
     } catch(err) {
-      console.error(err);
-      setMessages([{ role: 'assistant', content: "I'm having trouble connecting to my nature network. Please try again." }]);
-    } finally {
-      setIsTyping(false);
+      console.warn("Session background initialization error:", err);
     }
   };
 
@@ -298,8 +334,8 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
   }, [messages, isTyping, isComplete]);
 
   const handleSend = async (customMessage = null) => {
-    const textToSend = customMessage !== null ? customMessage : input;
-    if (!textToSend?.trim()) return;
+    const textToSend = typeof customMessage === 'string' ? customMessage : input;
+    if (!textToSend || !textToSend.trim() || isTyping) return;
     
     const userMessage = textToSend.trim();
     setInput('');
@@ -309,7 +345,14 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
     try {
       const reply = await naturopathyAPI.sendMessage(activeSessionId, userMessage, mode);
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'assistant', content: reply.message || reply.reply }]);
+      const assistantReply = reply.message || reply.reply || '';
+      setMessages(prev => [...prev, { role: 'assistant', content: assistantReply }]);
+      
+      if (reply.suggested_questions?.length) {
+        setSuggestedQuestions(reply.suggested_questions);
+      } else {
+        setSuggestedQuestions(deriveSampleQuestions(userMessage, assistantReply));
+      }
       
       if (reply.step) setStep(reply.step);
       if (reply.safety_flags?.length) setSafetyFlags(reply.safety_flags);
@@ -901,6 +944,112 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
               {messages.length <= 1 && mode === 'question' && !isTyping && !isComplete && (
                 <SymptomChips onSelectSymptom={(query) => handleSend(query)} />
               )}
+
+              {messages.length > 1 && mode === 'question' && !isTyping && !isComplete && (
+                <div 
+                  data-testid="suggested-followup-container"
+                  style={{
+                    width: '100%',
+                    padding: '1.25rem 1.5rem',
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    border: '1.5px solid var(--sage)',
+                    borderRadius: '16px',
+                    boxShadow: '0 2px 10px rgba(45, 62, 49, 0.05)',
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1.2rem' }}>💡</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--forest-dark)' }}>
+                        Do you want to ask this? You want to ask this?
+                      </div>
+                      <div style={{ fontSize: '0.775rem', color: 'var(--text-light)', marginTop: '2px' }}>
+                        Tap any question to ask immediately, or click edit to customize
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(suggestedQuestions.length > 0 ? suggestedQuestions.slice(0, 3) : deriveSampleQuestions(
+                      messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '',
+                      messages.filter(m => m.role === 'assistant').slice(-1)[0]?.content || ''
+                    )).map((q, idx) => (
+                      <div
+                        key={idx}
+                        data-testid={`suggested-question-${idx}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          background: 'var(--cream-light)',
+                          border: '1px solid var(--cream-dark)',
+                          borderRadius: '10px',
+                          padding: '6px 8px 6px 14px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ color: 'var(--forest)', fontSize: '0.9rem' }}>❓</span>
+                        <span 
+                          onClick={() => handleSend(q)}
+                          style={{
+                            flex: 1,
+                            fontSize: '0.875rem',
+                            color: 'var(--forest-dark)',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            lineHeight: 1.4
+                          }}
+                          title="Click to ask this question"
+                        >
+                          {q}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setInput(q)}
+                          title="Put in input box to edit before asking"
+                          style={{
+                            background: 'var(--white)',
+                            border: '1px solid var(--cream-dark)',
+                            borderRadius: '6px',
+                            padding: '5px 10px',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flexShrink: 0
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSend(q)}
+                          title="Ask this question now"
+                          style={{
+                            background: 'var(--forest)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 14px',
+                            fontSize: '0.8rem',
+                            color: 'var(--white)',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flexShrink: 0
+                          }}
+                        >
+                          Ask →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
@@ -1030,17 +1179,23 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
         {!(mode === 'treatment' && !isComplete) && (
           <div style={{ padding: '0.85rem 2rem', borderTop: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
             <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                background: 'var(--white)',
-                borderRadius: '2rem',
-                border: '1.5px solid var(--card-border)',
-                padding: '0.5rem 0.5rem 0.5rem 1.5rem',
-                boxShadow: '0 2px 12px rgba(72, 99, 59, 0.07)',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-              }}
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }}
+                autoComplete="on"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  background: 'var(--white)',
+                  borderRadius: '2rem',
+                  border: '1.5px solid var(--card-border)',
+                  padding: '0.5rem 0.5rem 0.5rem 1.5rem',
+                  boxShadow: '0 2px 12px rgba(72, 99, 59, 0.07)',
+                  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                }}
                 onFocusCapture={e => {
                   e.currentTarget.style.borderColor = 'var(--primary-green)';
                   e.currentTarget.style.boxShadow = '0 2px 16px rgba(72, 99, 59, 0.15)';
@@ -1052,10 +1207,12 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
               >
                 <input 
                   type="text" 
+                  name="query"
+                  autoComplete="on"
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSend()}
-                  placeholder="Describe your symptoms in detail…"
+                  placeholder="Describe your symptoms in detail or ask a follow-up…"
+                  disabled={isTyping}
                   style={{
                     flex: 1,
                     border: 'none',
@@ -1069,8 +1226,9 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
                   }}
                 />
                 <button 
-                  onClick={handleSend}
-                  disabled={!input.trim()}
+                  type="submit"
+                  disabled={isTyping || !input.trim()}
+                  title="Send message"
                   style={{
                     flexShrink: 0,
                     width: '2.75rem',
@@ -1081,18 +1239,18 @@ export default function ChatInterface({ sessionId, user, initialMode = 'question
                     justifyContent: 'center',
                     borderRadius: '50%',
                     border: 'none',
-                    cursor: input.trim() ? 'pointer' : 'not-allowed',
-                    background: input.trim() ? 'var(--primary-green)' : 'var(--card-border)',
+                    cursor: (!isTyping && input.trim()) ? 'pointer' : 'not-allowed',
+                    background: (!isTyping && input.trim()) ? 'var(--primary-green)' : 'var(--card-border)',
                     color: 'var(--white)',
                     transition: 'background 0.2s ease, transform 0.15s ease',
-                    boxShadow: input.trim() ? '0 2px 8px rgba(72, 99, 59, 0.25)' : 'none',
+                    boxShadow: (!isTyping && input.trim()) ? '0 2px 8px rgba(72, 99, 59, 0.25)' : 'none',
                   }}
-                  onMouseEnter={e => { if (input.trim()) e.currentTarget.style.transform = 'scale(1.08)'; }}
+                  onMouseEnter={e => { if (!isTyping && input.trim()) e.currentTarget.style.transform = 'scale(1.08)'; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   <Send size={16} />
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         )}
