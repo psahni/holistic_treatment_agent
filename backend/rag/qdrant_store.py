@@ -102,13 +102,22 @@ def ensure_collection_exists(client: QdrantClient):
         logger.warning(f"Error checking/creating Qdrant collection: {e}")
 
 
-def get_embeddings(texts: List[str]) -> List[List[float]]:
-    """Generates 3072-dim vector embeddings using gemini-embedding-001 (Gemini API key, free tier 15 RPM).
+# In-memory LRU-style cache for interactive query embeddings
+_query_embedding_cache: Dict[str, List[float]] = {}
+
+def get_embeddings(texts: List[str], is_batch: bool = False) -> List[List[float]]:
+    """Generates 3072-dim vector embeddings using gemini-embedding-001.
     
-    Note: gemini-embedding-001 is Gemini API-only — not available on Vertex AI.
-    Backoff schedule: 5s, 10s, 20s, 40s, 80s (exponential x5).
+    - For single interactive queries: Uses in-memory cache, fast 1-2s retries, and no artificial delays.
+    - For batch ingestion (is_batch=True): Throttles with 4.5s sleep to respect 15 RPM limits.
     """
-    max_retries = 8
+    # Check cache for single query
+    if len(texts) == 1 and not is_batch:
+        single_query = texts[0].strip()
+        if single_query in _query_embedding_cache:
+            return [_query_embedding_cache[single_query]]
+
+    max_retries = 6 if is_batch else 2
     for attempt in range(max_retries):
         try:
             eclient = get_embedding_client()
@@ -116,13 +125,27 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
                 model="models/gemini-embedding-001",
                 contents=texts
             )
-            time.sleep(4.5)  # Rate-limit throttle for batches (15 RPM = 4s per request)
-            return [e.values for e in res.embeddings]
+            # Only sleep during heavy offline batch indexing
+            if is_batch:
+                time.sleep(4.5)
+            
+            embeddings = [e.values for e in res.embeddings]
+            
+            # Cache single query results
+            if len(texts) == 1 and not is_batch and single_query:
+                _query_embedding_cache[single_query] = embeddings[0]
+                if len(_query_embedding_cache) > 500:
+                    _query_embedding_cache.pop(next(iter(_query_embedding_cache)))
+                    
+            return embeddings
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
-                wait_time = min(300, (2 ** attempt) * 10)  # 10s, 20s, 40s, 80s, 160s, 300s
-                logger.warning(f"Gemini embedding rate-limited. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})...")
+                if is_batch:
+                    wait_time = min(300, (2 ** attempt) * 10)
+                else:
+                    wait_time = 1.0 + attempt * 1.5  # Fast 1.0s, 2.5s for interactive UI
+                logger.warning(f"Gemini embedding rate-limited. Retrying in {wait_time:.1f}s (attempt {attempt+1}/{max_retries})...")
                 time.sleep(wait_time)
             else:
                 logger.error(f"Error generating embeddings: {e}")
@@ -144,7 +167,7 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
         batch = valid_chunks[i:i + batch_size]
         texts = [c.get("text", "") for c in batch]
         
-        vectors = get_embeddings(texts)
+        vectors = get_embeddings(texts, is_batch=True)
         
         for chunk, vector in zip(batch, vectors):
             point_id = str(uuid.uuid4())
@@ -167,11 +190,11 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
 
 
 def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
-    """Searches Qdrant for book chunks relevant to the query."""
+    """Searches Qdrant for book chunks relevant to the query. Gracefully returns empty list if throttled."""
     start_time = time.time()
     try:
         client = get_qdrant_client()
-        query_vector = get_embeddings([query])[0]
+        query_vector = get_embeddings([query], is_batch=False)[0]
 
         if hasattr(client, "query_points"):
             res = client.query_points(
@@ -212,8 +235,8 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
 
         return results
     except Exception as e:
-        logger.error(f"Qdrant vector search failed: {e}")
-        raise e
+        logger.warning(f"Qdrant vector search skipped/fallback ({e}). Proceeding without book context.")
+        return []
 
 def get_document_chunk_count(filename: str) -> int:
     """Returns the number of chunks stored in Qdrant for a specific document."""

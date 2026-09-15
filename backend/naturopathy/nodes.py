@@ -225,8 +225,12 @@ def qdrant_query_node(state: NaturopathyState) -> NaturopathyState:
             break
     if not latest_user_message:
         latest_user_message = "Naturopathy health consultation and remedies"
-    hybrid = retrieve_hybrid_context(latest_user_message)
-    retrieved_context = hybrid.get("context_text", "")
+    try:
+        hybrid = retrieve_hybrid_context(latest_user_message)
+        retrieved_context = hybrid.get("context_text", "")
+    except Exception as e:
+        logger.warning(f"Hybrid retrieval encountered error ({e}). Proceeding without book context.")
+        retrieved_context = ""
     state["retrieved_context"] = retrieved_context
     return state
 
