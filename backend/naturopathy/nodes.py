@@ -55,6 +55,22 @@ def setup_llm_cache():
         
     _cache_initialized = True
 
+def normalize_llm_content(content: Any) -> str:
+    """Safely extracts a single clean string from LLM response.content (str, list of strings, or list of dicts)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text", item)))
+            else:
+                parts.append(str(item))
+        return " ".join(parts).strip()
+    return str(content) if content is not None else ""
+
 def get_llm():
     setup_llm_cache()
     if settings.USE_VERTEX_AI:
@@ -153,7 +169,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
         logger.info(f"DEBUG LLM OUTPUT (Question Mode): {response.content}")
         
         if response and response.content:
-            content = response.content
+            content = normalize_llm_content(response.content)
             if "[MODE: treatment]" in content:
                 state["recommended_mode"] = "treatment"
                 content = content.replace("[MODE: treatment]", "").strip()
@@ -196,7 +212,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             state["recommended_mode"] = None
         else:
             if response and response.content:
-                content = response.content
+                content = normalize_llm_content(response.content)
                 if "[MODE: treatment]" in content:
                     state["recommended_mode"] = "treatment"
                     content = content.replace("[MODE: treatment]", "").strip()
@@ -247,7 +263,7 @@ def root_cause_node(state: NaturopathyState) -> NaturopathyState:
 
     response = llm.invoke(messages)
     try:
-        content = response.content
+        content = normalize_llm_content(response.content)
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
@@ -278,7 +294,7 @@ def medical_triage_node(state: NaturopathyState) -> NaturopathyState:
     
     response = llm.invoke(messages)
     try:
-        content = response.content
+        content = normalize_llm_content(response.content)
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
@@ -305,7 +321,7 @@ def recommendation_node(state: NaturopathyState) -> NaturopathyState:
     
     response = llm.invoke(messages)
     try:
-        content = response.content
+        content = normalize_llm_content(response.content)
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:

@@ -6,13 +6,29 @@ ALLOPATHIC_KEYWORDS = [
     "antibiotic", "steroid", "metformin", "aspirin", "ibuprofen", "prescription", "dosage mg"
 ]
 
+def _to_string(text) -> str:
+    if isinstance(text, str):
+        return text
+    if isinstance(text, list):
+        parts = []
+        for item in text:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text", item)))
+            else:
+                parts.append(str(item))
+        return " ".join(parts).strip()
+    return str(text) if text is not None else ""
+
 def inject_disclaimer(text: str) -> str:
-    if AYUSH_DISCLAIMER.strip() not in text:
-        return text + "\n\n" + AYUSH_DISCLAIMER.strip()
-    return text
+    text_str = _to_string(text)
+    if AYUSH_DISCLAIMER.strip() not in text_str:
+        return text_str + "\n\n" + AYUSH_DISCLAIMER.strip()
+    return text_str
 
 def check_allopathic_leakage(text: str) -> bool:
-    text_lower = text.lower()
+    text_lower = _to_string(text).lower()
     return any(kw in text_lower for kw in ALLOPATHIC_KEYWORDS)
 
 def route_to_practitioner(state: dict) -> bool:
@@ -30,8 +46,9 @@ def route_to_practitioner(state: dict) -> bool:
     return False
 
 def run_output_guardrails(text: str, state: dict) -> dict:
-    allopathic_blocked = check_allopathic_leakage(text)
-    safe_output = text
+    clean_text = _to_string(text)
+    allopathic_blocked = check_allopathic_leakage(clean_text)
+    safe_output = clean_text
     
     if allopathic_blocked:
         safe_output = "I apologize, but I cannot provide recommendations involving allopathic medications. Please consult a medical doctor for such concerns."
