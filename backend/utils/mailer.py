@@ -79,7 +79,7 @@ def send_prescription_email(to_email: str, patient_name: str, prescription_data:
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_from, to_email, msg.as_string())
                 
-            logger.info(f"Successfully sent prescription email to {to_email}")
+            logger.info("Successfully sent prescription email")
             return True
         except Exception as e:
             logger.error(f"Failed to send email via SMTP: {e}")
@@ -93,7 +93,7 @@ def send_prescription_email(to_email: str, patient_name: str, prescription_data:
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        logger.info(f"Saved simulated email output to {file_path}")
+        logger.info(f"Saved simulated email output to {email_dir}")
         return True
     except Exception as e:
         logger.error(f"Failed to write email file: {e}")

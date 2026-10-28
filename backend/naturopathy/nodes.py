@@ -4,7 +4,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_google_vertexai import ChatVertexAI
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Optional
 
 class AgentResponse(BaseModel):
     message: str = Field(description="The formatted response to the user.")
@@ -172,7 +172,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             messages.append(HumanMessage(content=intro))
             
         response = llm.invoke(messages)
-        logger.info(f"DEBUG LLM OUTPUT (Question Mode): {response.content}")
+        logger.info(f"LLM response received (Question Mode, chars={len(str(response.content or ''))})")
         
         if response and response.content:
             content = normalize_llm_content(response.content)
@@ -244,7 +244,7 @@ def intake_node(state: NaturopathyState) -> NaturopathyState:
             messages.append(HumanMessage(content=intro))
             
         response = llm.invoke(messages)
-        logger.info(f"DEBUG LLM OUTPUT (Treatment Mode): {response.content}")
+        logger.info(f"LLM response received (Treatment Mode, chars={len(str(response.content or ''))})")
         
         if len(responses) >= 8:
             state["step"] = "root_cause"

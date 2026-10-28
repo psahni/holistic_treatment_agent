@@ -42,8 +42,8 @@ cors_origins = set(settings.CORS_ORIGINS) if isinstance(settings.CORS_ORIGINS, l
 cors_origins.update([
     "http://localhost:5173", 
     "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://localhost:5001",
+    "http://127.0.0.1:5001",
 ])
 
 app.add_middleware(
@@ -249,48 +249,32 @@ def delete_patient_case(
     db: Session = Depends(get_db)
 ):
     try:
-        print(f"=== DELETE CASE {case_id} REQUEST RECEIVED ===")
-        sys.stdout.flush()
-        
         current_user = get_optional_current_user(request, db)
         if not current_user:
-            print("ERROR: Authentication failed during case deletion (current_user is None).")
-            sys.stdout.flush()
+            logger.warning(f"Delete case {case_id}: unauthenticated request")
             raise HTTPException(status_code=401, detail="Authentication required")
-            
-        print(f"User authenticated: {current_user.id}")
-        sys.stdout.flush()
-        
+
         s = db.query(ConsultationSession).filter(
             ConsultationSession.case_id == case_id,
             ConsultationSession.user_id == current_user.id
         ).first()
-        
+
         if not s:
-            print(f"ERROR: Case {case_id} not found for user {current_user.id} in DB.")
-            sys.stdout.flush()
+            logger.info(f"Delete case {case_id}: not found for requesting user")
             raise HTTPException(status_code=404, detail="Case not found")
-            
-        print(f"Case found in DB. Current status: '{s.status}'")
-        sys.stdout.flush()
-            
+
         if s.status != 'pending_review':
-            print(f"ERROR: Case {case_id} status is '{s.status}', deletion forbidden. Must be 'pending_review'.")
-            sys.stdout.flush()
+            logger.info(f"Delete case {case_id}: forbidden, status is '{s.status}'")
             raise HTTPException(status_code=403, detail="Cannot delete a case that is already reviewed or in progress.")
-            
+
         db.delete(s)
         db.commit()
-        print(f"=== SUCCESSFULLY DELETED CASE {case_id} ===")
-        sys.stdout.flush()
+        logger.info(f"Delete case {case_id}: deleted")
         return {"status": "deleted"}
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"=== UNEXPECTED ERROR DELETING CASE {case_id} ===")
-        import traceback
-        traceback.print_exc()
-        sys.stdout.flush()
+    except Exception:
+        logger.exception(f"Delete case {case_id}: unexpected error")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
