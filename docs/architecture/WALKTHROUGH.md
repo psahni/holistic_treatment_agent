@@ -131,7 +131,7 @@ flowchart TD
 | Check | Status |
 |-------|--------|
 | Backend starts on port 8080 (`uvicorn main:app`) | ✅ |
-| Frontend starts on port 3000 (`npm run dev`) | ✅ |
+| Frontend starts on port 5001 (`npm run dev`) | ✅ |
 | Safety eval suite (13/13 tests) | ✅ |
 | PostgreSQL graceful degradation (runs without Postgres) | ✅ |
 | Redis graceful degradation (falls back to in-memory dict) | ✅ |
@@ -154,7 +154,7 @@ python -m uvicorn main:app --reload --port 8080
 cd frontend
 npm run dev
 
-# 4. Open http://localhost:3000
+# 4. Open http://localhost:5001
 ```
 
 ---

@@ -56,7 +56,7 @@ npm install
 # Environment Setup
 cp .env.local.example .env.local 
 ```
-*Note: Make sure the `NEXT_PUBLIC_API_URL` inside `frontend/.env.local` points to your backend's URL (default is `http://localhost:8000`).*
+*Note: Make sure the `NEXT_PUBLIC_API_URL` inside `frontend/.env.local` points to your backend's URL (default is `http://localhost:5000`).*
 
 ### 4. Setting up RAG (Knowledge Base)
 To use the Hybrid RAG feature, you must ingest Naturopathy documents into your Qdrant Vector database.
@@ -73,23 +73,31 @@ To use the Hybrid RAG feature, you must ingest Naturopathy documents into your Q
    ```
 
 ### 5. Start Server
-You can control the application processes using the `Makefile` or provided PowerShell scripts from the project root.
+One script, `scripts/dev.py`, starts and stops the servers on **Windows, macOS and Linux**. It needs only Python 3.8+ (no extra packages), and the backend and frontend packages from steps 2 and 3 installed. If `backend/.venv` exists, it is used automatically.
 
-**Start both backend and frontend concurrently:**
+**Start both backend and frontend (in the background):**
 ```bash
+python scripts/dev.py start      # use `python3` on macOS/Linux if `python` isn't found
+# or, if you have make:
 make start
-# Or on Windows: .\scripts\start.ps1
 ```
+It waits until both servers answer, then prints their addresses. Logs go to `.dev/logs/`.
 
 **Which port should we open in the browser?**
-- **Frontend UI:** Open your browser to **`http://localhost:3000`** to interact with the web application.
-- **Backend API:** The FastAPI server runs on **`http://localhost:8000`**. You can access the Swagger API documentation at `http://localhost:8000/docs`.
+- **Frontend UI:** Open your browser to **`http://localhost:5001`** to interact with the web application.
+- **Backend API:** The FastAPI server runs on **`http://localhost:5000`**. You can access the Swagger API documentation at `http://localhost:5000/docs`.
 
-**To stop all servers:**
+**Other commands:**
 ```bash
-make stop
-# Or on Windows: .\scripts\stop.ps1
+python scripts/dev.py status           # what is running
+python scripts/dev.py logs backend -f  # follow a log (Ctrl+C to quit)
+python scripts/dev.py stop             # stop the servers that `start` launched
+python scripts/dev.py restart
+python scripts/dev.py run backend      # run one server in the foreground
 ```
+`stop` only stops servers started by `start`. Another program using port 5000 or 5001 is never touched. If a port is busy, `start` tells you and does not start that server.
+
+**Installing `make` (optional):** macOS `xcode-select --install`, Debian/Ubuntu `sudo apt install make`, Windows `winget install ezwinports.make` (then open a new terminal).
 
 ---
 
@@ -97,10 +105,11 @@ make stop
 
 | Command | Action |
 |---|---|
-| `make start` | Starts both Backend (Port 8000) and Frontend (Port 3000) |
-| `make stop` | Stops all running Backend and Frontend server processes |
-| `make start-backend` | Starts FastAPI backend only (`http://localhost:8000`) |
-| `make start-frontend` | Starts Next.js frontend only (`http://localhost:3000`) |
+| `make start` | Starts both Backend (Port 5000) and Frontend (Port 5001) in the background |
+| `make stop` | Stops the servers started by `make start` |
+| `make restart` / `make status` / `make logs` | Restart, show what is running, show recent logs |
+| `make start-backend` | Runs the FastAPI backend in the foreground (`http://localhost:5000`) |
+| `make start-frontend` | Runs the Next.js frontend in the foreground (`http://localhost:5001`) |
 | `make ingest` | Parses & indexes PDF books from `backend/data/docs/` into Qdrant |
 | `make seed` | Indexes initial Naturopathy Knowledge Base into Qdrant vector store |
 | `make test` | Runs safety & quality test suite (`pytest`) |
