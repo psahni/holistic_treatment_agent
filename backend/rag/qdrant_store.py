@@ -6,7 +6,7 @@ import time
 from typing import List, Dict, Any, Optional
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
 from google import genai
 
 from config import get_settings
@@ -100,6 +100,32 @@ def ensure_collection_exists(client: QdrantClient):
             )
     except Exception as e:
         logger.warning(f"Error checking/creating Qdrant collection: {e}")
+        return
+    ensure_payload_indexes(client)
+
+
+# Fields that are filtered on (document counts, hashes, deletes). Qdrant Cloud runs with strict
+# mode, which rejects filters on fields without an index ("Index required but not found").
+INDEXED_PAYLOAD_FIELDS = ("source", "file_hash")
+
+
+def ensure_payload_indexes(client: QdrantClient):
+    """Creates keyword payload indexes for the filtered fields (remote Qdrant only; local mode ignores indexes)."""
+    if not settings.QDRANT_URL:
+        return
+    try:
+        existing = set((client.get_collection(COLLECTION_NAME).payload_schema or {}).keys())
+        for field in INDEXED_PAYLOAD_FIELDS:
+            if field not in existing:
+                logger.info(f"Creating payload index on '{field}' in '{COLLECTION_NAME}'...")
+                client.create_payload_index(
+                    collection_name=COLLECTION_NAME,
+                    field_name=field,
+                    field_schema=PayloadSchemaType.KEYWORD,
+                    wait=True,
+                )
+    except Exception as e:
+        logger.error(f"Could not create Qdrant payload indexes ({type(e).__name__}): {e}")
 
 
 # In-memory LRU-style cache for interactive query embeddings
@@ -153,24 +179,33 @@ def get_embeddings(texts: List[str], is_batch: bool = False) -> List[List[float]
     raise Exception("Max retries exceeded for Gemini embedding API")
 
 
-def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_id: str = "") -> int:
-    """Inserts text chunks with metadata into Qdrant."""
+def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_id: str = "",
+                        ids: Optional[List[str]] = None) -> int:
+    """Inserts text chunks with metadata into Qdrant.
+
+    Pass `ids` (one per chunk) for deterministic point ids, so re-sending a chunk overwrites it
+    instead of duplicating it. Without `ids`, random UUIDs are used.
+    """
     client = get_qdrant_client()
     points = []
 
-    # Filter valid text chunks first
-    valid_chunks = [c for c in chunks if c.get("text", "").strip()]
+    if ids is not None and len(ids) != len(chunks):
+        raise ValueError("ids must have one entry per chunk")
+    id_list = ids if ids is not None else [None] * len(chunks)
+
+    # Filter valid text chunks first (keeping each chunk paired with its id)
+    valid = [(c, pid) for c, pid in zip(chunks, id_list) if c.get("text", "").strip()]
     
     # Process in batches of 200 to avoid rate limits
     batch_size = 200
-    for i in range(0, len(valid_chunks), batch_size):
-        batch = valid_chunks[i:i + batch_size]
-        texts = [c.get("text", "") for c in batch]
+    for i in range(0, len(valid), batch_size):
+        batch = valid[i:i + batch_size]
+        texts = [c.get("text", "") for c, _ in batch]
         
         vectors = get_embeddings(texts, is_batch=True)
         
-        for chunk, vector in zip(batch, vectors):
-            point_id = str(uuid.uuid4())
+        for (chunk, pid), vector in zip(batch, vectors):
+            point_id = pid or str(uuid.uuid4())
             payload = {
                 "text": chunk.get("text", ""),
                 "source": chunk.get("source", "unknown"),
@@ -227,7 +262,7 @@ def search_vector_store(query: str, limit: int = 4) -> List[Dict[str, Any]]:
         logger.info(json.dumps({
             "event": "qdrant_search",
             "collection": COLLECTION_NAME,
-            "query": query,
+            "query_len": len(query),
             "k": limit,
             "hits": len(results),
             "latency_ms": latency_ms
@@ -258,26 +293,65 @@ def get_document_chunk_count(filename: str) -> int:
         logger.error(f"Failed to count chunks for {filename}: {e}")
         return -1
 
-def delete_document_by_source(filename: str) -> bool:
-    """Deletes all chunks associated with a specific document from Qdrant."""
+def _source_filter(filename: str, keep_file_hash: Optional[str] = None) -> Filter:
+    must_not = None
+    if keep_file_hash:
+        must_not = [FieldCondition(key="file_hash", match=MatchValue(value=keep_file_hash))]
+    return Filter(
+        must=[FieldCondition(key="source", match=MatchValue(value=filename))],
+        must_not=must_not,
+    )
+
+
+def delete_document_by_source(filename: str, keep_file_hash: Optional[str] = None, raise_errors: bool = False) -> bool:
+    """Deletes the chunks of a document from Qdrant.
+
+    With `keep_file_hash`, chunks of that version are kept and only the other versions are deleted.
+    """
     try:
         client = get_qdrant_client()
         client.delete(
             collection_name=COLLECTION_NAME,
-            points_selector=Filter(
-                must=[
-                    FieldCondition(
-                        key="source",
-                        match=MatchValue(value=filename)
-                    )
-                ]
-            )
+            points_selector=_source_filter(filename, keep_file_hash),
+            wait=True,
         )
-        logger.info(f"Successfully deleted all chunks for {filename} from Qdrant.")
+        logger.info(f"Deleted chunks for {filename} from Qdrant (kept version: {keep_file_hash or 'none'}).")
         return True
     except Exception as e:
         logger.error(f"Failed to delete document {filename} from Qdrant: {e}")
+        if raise_errors:
+            raise
         return False
+
+
+def get_document_texts(filename: str) -> List[str]:
+    """Returns the text of every stored chunk of a document (no vectors). Raises on Qdrant errors."""
+    client = get_qdrant_client()
+    texts: List[str] = []
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=_source_filter(filename),
+            limit=256,
+            offset=offset,
+            with_payload=["text"],
+            with_vectors=False,
+        )
+        texts.extend((p.payload or {}).get("text", "") for p in points)
+        if offset is None:
+            return texts
+
+
+def set_document_hash(filename: str, file_hash: str) -> None:
+    """Tags every chunk of a document with `file_hash` (used once for chunks ingested before hashes were stored)."""
+    client = get_qdrant_client()
+    client.set_payload(
+        collection_name=COLLECTION_NAME,
+        payload={"file_hash": file_hash},
+        points=_source_filter(filename),
+        wait=True,
+    )
 
 def get_document_hash(filename: str) -> Optional[str]:
     """Retrieves the file hash for a given document if it exists in Qdrant."""

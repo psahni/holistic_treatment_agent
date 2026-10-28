@@ -73,6 +73,20 @@ class PrescriptionTemplate(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+class DocumentIngestion(Base):
+    """Ingestion progress of one knowledge-base PDF, so failed runs can resume where they stopped."""
+    __tablename__ = 'document_ingestions'
+
+    filename = Column(String, primary_key=True)
+    file_hash = Column(String, nullable=True)       # SHA-256 of the version being (or last) ingested
+    previous_hash = Column(String, nullable=True)   # older completed version kept searchable during a replace
+    status = Column(String, nullable=False, default='pending')  # pending, in_progress, completed, failed
+    total_chunks = Column(Integer, nullable=False, default=0)
+    embedded_chunks = Column(Integer, nullable=False, default=0)  # chunks confirmed stored in Qdrant, in order
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
 settings = get_settings()
 
 def create_db_engine(db_url: str):
@@ -96,7 +110,8 @@ try:
     engine = create_db_engine(settings.DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 except Exception as e:
-    logger.warning(f"Could not create initial DB engine for {settings.DATABASE_URL}: {e}")
+    # Don't log the URL or exception text: both can contain the DB password.
+    logger.warning(f"Could not create initial DB engine ({type(e).__name__})")
 
 def run_migrations(bind_engine):
     try:
@@ -179,7 +194,7 @@ def init_db():
             logger.info(f"Successfully initialized database tables using {engine.url}")
             return
         except Exception as e:
-            logger.warning(f"⚠️ Primary DB connection failed ({settings.DATABASE_URL}): {e}")
+            logger.warning(f"⚠️ Primary DB connection failed ({engine.url}): {e}")
 
     # Fallback to local SQLite database if PostgreSQL fails
     fallback_url = "sqlite:///./holistic_health.db"

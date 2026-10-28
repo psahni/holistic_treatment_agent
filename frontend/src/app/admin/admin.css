@@ -177,6 +177,120 @@
   color: #854d0e;
 }
 
+.status-badge.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Document ingestion status */
+.ingest-help {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-color);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.ingest-help ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.doc-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.doc-notice.info { background: #dbeafe; color: #1e40af; }
+.doc-notice.error { background: #fee2e2; color: #991b1b; }
+
+.doc-notice-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.doc-progress {
+  margin-top: 0.4rem;
+  min-width: 140px;
+}
+
+.doc-progress .progress-bar-container {
+  margin-bottom: 0.25rem;
+}
+
+.doc-subtext {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 0.25rem;
+}
+
+.doc-error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 0.25rem;
+  max-width: 320px;
+  overflow-wrap: anywhere;
+}
+
+.admin-btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 1rem;
+}
+
+.admin-modal {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 480px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.admin-modal h3 {
+  margin: 0 0 0.75rem;
+}
+
+.admin-modal ul {
+  padding-left: 1.2rem;
+}
+
+.admin-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
 .action-buttons {
   display: flex;
   gap: 0.5rem;

@@ -4,7 +4,6 @@ from pathlib import Path
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Response, Request
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -12,8 +11,9 @@ from sqlalchemy.orm import Session
 
 from config import get_settings
 from database.models import get_db, ConsultationSession, User, PatientProfile, PrescriptionTemplate
+import hashlib
 from rag.qdrant_store import get_document_chunk_count, delete_document_by_source, search_vector_store, get_genai_client
-from ingest_docs import yield_ingestion_progress, DOCS_DIR
+import ingest_docs
 
 router = APIRouter()
 settings = get_settings()
@@ -67,55 +67,84 @@ def logout(response: Response):
 def check_auth(admin: str = Depends(get_current_admin)):
     return {"authenticated": True, "user": admin}
 
+def _pdf_files() -> List[str]:
+    os.makedirs(ingest_docs.DOCS_DIR, exist_ok=True)
+    return sorted(f for f in os.listdir(ingest_docs.DOCS_DIR) if f.lower().endswith(".pdf"))
+
+def _describe_doc(file_name: str) -> dict:
+    try:
+        return ingest_docs.describe_document(file_name, get_document_chunk_count(file_name))
+    except Exception as e:
+        return {"filename": file_name, "status": "db_error", "chunks": 0, "total_chunks": 0,
+                "embedded_chunks": 0, "last_error": f"{type(e).__name__}: {str(e)[:200]}", "replacing": False}
+
 @router.get("/docs")
 async def list_docs(admin: str = Depends(get_current_admin)):
-    os.makedirs(DOCS_DIR, exist_ok=True)
-    pdf_files = [f for f in os.listdir(DOCS_DIR) if f.lower().endswith(".pdf")]
-    
     docs_info = []
-    for file_name in pdf_files:
-        chunk_count = await asyncio.to_thread(get_document_chunk_count, file_name)
-        
-        status = "pending"
-        if chunk_count > 0:
-            status = "ingested"
-        elif chunk_count < 0:
-            status = "db_error"
-            chunk_count = 0
-            
-        docs_info.append({
-            "filename": file_name,
-            "status": status,
-            "chunks": chunk_count
-        })
-        
+    for file_name in _pdf_files():
+        docs_info.append(await asyncio.to_thread(_describe_doc, file_name))
     return {"docs": docs_info}
 
 def _save_file_sync(file_path: str, contents: bytes):
-    with open(file_path, "wb") as buffer:
+    # Write to a temp file first so a failed write never leaves a half-written PDF behind.
+    tmp_path = file_path + ".uploading"
+    with open(tmp_path, "wb") as buffer:
         buffer.write(contents)
+    os.replace(tmp_path, file_path)
 
 @router.post("/upload")
-async def upload_doc(file: UploadFile = File(...), admin: str = Depends(get_current_admin)):
+async def upload_doc(file: UploadFile = File(...), replace: bool = False, admin: str = Depends(get_current_admin)):
+    """Uploads a PDF. Uploading a different file under an existing name needs replace=true."""
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-        
-    os.makedirs(DOCS_DIR, exist_ok=True)
+
     # SECURITY: Prevent path traversal
     safe_filename = Path(file.filename).name
-    file_path = os.path.join(DOCS_DIR, safe_filename)
-    
+    file_path = ingest_docs.doc_path(safe_filename)
+    os.makedirs(ingest_docs.DOCS_DIR, exist_ok=True)
+
+    if ingest_docs.is_ingestion_running(safe_filename):
+        raise HTTPException(status_code=409, detail=f"{safe_filename} is being ingested right now. Wait for it to finish before replacing it.")
+
     contents = await file.read()
+    new_hash = hashlib.sha256(contents).hexdigest()
+    exists = os.path.exists(file_path)
+
+    if exists:
+        existing_hash = await asyncio.to_thread(ingest_docs.file_sha256, file_path)
+        if existing_hash == new_hash:
+            return {"status": "unchanged", "filename": safe_filename,
+                    "message": f"{safe_filename} is already uploaded with identical content. Nothing changed."}
+        if not replace:
+            raise HTTPException(status_code=409, detail={
+                "code": "document_exists",
+                "filename": safe_filename,
+                "message": f"A different file named {safe_filename} already exists.",
+            })
+        # Record the current version (including documents ingested before status tracking) before overwriting it.
+        try:
+            await asyncio.to_thread(ingest_docs.ensure_status_row, safe_filename)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Could not read the current version's status ({type(e).__name__}). Try again.")
+
     await asyncio.to_thread(_save_file_sync, file_path, contents)
-        
-    return {"message": f"Successfully uploaded {safe_filename}", "filename": safe_filename}
+    await asyncio.to_thread(ingest_docs.register_upload, safe_filename, new_hash)
+
+    return {
+        "status": "replaced" if exists else "uploaded",
+        "filename": safe_filename,
+        "message": f"Successfully {'replaced' if exists else 'uploaded'} {safe_filename}",
+    }
 
 @router.delete("/docs/{filename}")
 async def delete_doc(filename: str, admin: str = Depends(get_current_admin)):
     # SECURITY: Prevent path traversal
     safe_filename = Path(filename).name
-    file_path = os.path.join(DOCS_DIR, safe_filename)
-    
+    file_path = ingest_docs.doc_path(safe_filename)
+
+    if ingest_docs.is_ingestion_running(safe_filename):
+        raise HTTPException(status_code=409, detail=f"{safe_filename} is being ingested right now. Wait for it to finish before deleting it.")
+
     # 1. Delete from Qdrant
     qdrant_deleted = await asyncio.to_thread(delete_document_by_source, safe_filename)
     
@@ -124,30 +153,29 @@ async def delete_doc(filename: str, admin: str = Depends(get_current_admin)):
     if os.path.exists(file_path):
         os.remove(file_path)
         fs_deleted = True
+
+    # 3. Forget its ingestion status (only once its chunks are gone, so a retry can still find them)
+    if qdrant_deleted:
+        await asyncio.to_thread(ingest_docs.delete_status_row, safe_filename)
         
     if not qdrant_deleted and not fs_deleted:
         raise HTTPException(status_code=404, detail="File not found in DB or filesystem")
         
     return {"message": f"Deleted {safe_filename}", "qdrant_deleted": qdrant_deleted, "fs_deleted": fs_deleted}
 
-@router.get("/ingest/{filename}")
-async def stream_ingestion(filename: str): # Authentication omitted for SSE or handled via token in URL if necessary, but assuming internal
+@router.post("/ingest/{filename}", status_code=202)
+async def start_ingestion(filename: str, restart: bool = False, admin: str = Depends(get_current_admin)):
+    """Starts (or resumes) ingestion in the background. Poll GET /docs for progress.
+
+    restart=true discards this version's partially embedded chunks and starts from the first chunk.
+    """
     safe_filename = Path(filename).name
-    file_path = os.path.join(DOCS_DIR, safe_filename)
-    if not os.path.exists(file_path):
+    if not os.path.exists(ingest_docs.doc_path(safe_filename)):
         raise HTTPException(status_code=404, detail="File not found")
-        
-    async def sse_generator():
-        # Wrap the generator in asyncio.to_thread for each iteration to avoid blocking event loop
-        generator = yield_ingestion_progress(file_path)
-        while True:
-            try:
-                progress_json = await asyncio.to_thread(next, generator)
-                yield f"data: {progress_json}\n\n"
-            except StopIteration:
-                break
-            
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+    if not ingest_docs.start_ingestion_thread(safe_filename, restart=restart):
+        raise HTTPException(status_code=409, detail=f"{safe_filename} is already being ingested.")
+    return {"status": "started", "filename": safe_filename, "restart": restart}
 
 @router.get("/embeddings/search")
 async def search_embeddings(q: str, limit: int = 5, admin: str = Depends(get_current_admin)):
