@@ -81,7 +81,7 @@ The implementation is in `backend/rag/qdrant_store.py`:
 - It stores text, source, page, title, category, file fingerprint, and document ID alongside the numbers.
 - It does not explicitly tell the model whether the text is a document or a search question through embedding task types.
 
-Qdrant can run as an online service or use files on the local computer. Test mode can use temporary memory. If local storage is already locked by another program, the app can switch to empty temporary storage.
+Qdrant can run as an online service or use files on the local computer. Test mode can use temporary memory. In normal development or production, if another process has locked the local Qdrant files, the operation stops with an error. This prevents the system from reporting success after writing vectors only to temporary memory.
 
 The code slows document loading and retries some quota errors to reduce pressure on the embedding service. A quota is a provider's limit on use. Question searches use shorter retries. Some repeated question embeddings are saved for reuse.
 

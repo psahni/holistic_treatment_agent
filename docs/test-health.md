@@ -1,12 +1,12 @@
 # Test health check
 
-Checked on 2026-10-28 using the existing installed packages. No application or test code was changed, and no packages were installed. This report covers local checks; it does not establish that real online AI, search, database hosting, or email services work.
+Initially checked on 2026-10-28 using the existing installed packages. A focused follow-up on 2026-10-29 verified the local-Qdrant lock safety change and then reran the full backend suite. No packages were installed. This report covers local checks; it does not establish that real online AI, search, database hosting, or email services work.
 
 ## Results
 
 | Area | Result | Meaning |
 |---|---|---|
-| Backend tests, including API workflows | 48 passed on the final run | Existing checks work from the documented backend folder with a fresh test database |
+| Backend tests, including API workflows | 50 passed on the 2026-10-29 run | Includes two regression tests for persistent local Qdrant lock handling and test-only memory storage |
 | Frontend tests | 50 passed across 9 suites | Existing website checks passed |
 | Frontend coverage requirement | Failed | Tests exercise less code than the configured 75% minimum |
 | Local safety/reference evals | 14 passed | Existing keyword checks and reference-file checks passed |

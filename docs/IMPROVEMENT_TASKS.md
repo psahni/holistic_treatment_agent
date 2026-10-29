@@ -4,6 +4,49 @@ Status: ⬜ todo · 🔄 in progress · ✅ done · ⏸️ blocked / needs decis
 
 Out of scope: routing (Question Mode prompt and `[MODE: treatment]` handling) is owner-managed.
 
+## Resumable ingestion: work required before live testing
+
+These two high-priority tasks come from the resumable-ingestion code review. Complete and test them before using the new ingestion flow against live documents.
+
+### I1 · Never fall back to temporary Qdrant storage during ingestion ✅
+
+**Problem:** When the local on-disk Qdrant database is locked by another process, `backend/rag/qdrant_store.py` silently opens an in-memory Qdrant database. An ingestion can then write only to temporary memory while its SQL row is marked `completed`. The temporary vectors disappear when that process exits, leaving a false completed status.
+
+**Approach:**
+
+1. Allow in-memory Qdrant only when the application is explicitly running in the test environment.
+2. If the local on-disk database is locked in development or production, raise a clear error instead of falling back.
+3. Make sure ingestion records that error as `failed` and does not advance `embedded_chunks` or set `completed`.
+4. Give the operator a useful message: stop the process holding the local store, or configure a shared Qdrant service. Do not include credentials or other secret values in the message.
+5. Add a test that simulates the local-store lock/open failure and proves that no in-memory store is created and no completed status is written.
+
+**Important files:** `backend/rag/qdrant_store.py`, `backend/ingest_docs.py`, and `backend/tests/test_document_ingestion.py` (or a focused Qdrant-store test file).
+
+**Done when:** A locked or unavailable persistent Qdrant store produces a visible failed ingestion; SQL never says completed for vectors written only to memory; normal test-mode in-memory Qdrant still works.
+
+**Implemented:** Local lock errors now stop the operation with a safe, actionable message. In-memory Qdrant is limited to explicit test mode. Regression tests verify both paths and confirm that a locked-store ingestion remains failed with zero saved chunks.
+
+### I2 · Verify legacy chunks before marking a document completed ⬜
+
+**Problem:** The first-time legacy backfill currently treats `qdrant_count >= expected_chunks` as completed and may apply the current file hash to every stored chunk. Extra, duplicate, or unrelated chunks under the same filename can therefore be accepted as the current PDF without being re-embedded.
+
+**Approach:**
+
+1. Do not accept `qdrant_count > expected_chunks` as a completed match.
+2. When the counts are equal, fetch the stored chunk text payloads and compare them with the chunks extracted from the current PDF. The comparison may ignore Qdrant result order, but it must preserve duplicate counts.
+3. Apply the current file hash and create a `completed` row only after that comparison succeeds.
+4. If the count or content does not match, keep the existing chunks searchable as the previous unverified version, show a failed/retryable status, and re-embed the current PDF from chunk 1 when the admin retries.
+5. Do not change metadata on the existing chunks until their match has been verified.
+6. Add tests for an exact valid match, excess chunks, equal-count wrong content, duplicate-text differences, and failure while reading legacy payloads.
+
+**Important files:** `backend/ingest_docs.py`, `backend/rag/qdrant_store.py`, and `backend/tests/test_document_ingestion.py`.
+
+**Done when:** Only an exact content match is adopted without re-embedding; extra or different legacy chunks can never produce a completed status or receive the current file hash.
+
+### Temporary concurrency decision
+
+Run the backend with **one worker only** for now. The current `_active_ingestions` lock exists only inside one Python process. Do not configure multiple Uvicorn/Gunicorn workers or multiple backend instances for document ingestion until a database-backed lock or durable job queue is implemented. The local development runner already starts one Uvicorn worker.
+
 ## Current state (checked 2026-10-15)
 - Qdrant cluster `naturopathy_books`: green, **900 points, all from the Nature Cure handbook PDF**. No knowledge-base JSON content is indexed, there are no payload indexes, and there are no duplicate chunks.
 - **The Gemini API key in `backend/.env` is rejected (`API_KEY_INVALID`).** Every query embedding fails, `search_vector_store` swallows the error and returns `[]`, and the agent answers **with no retrieved sources** while nothing visible goes wrong.

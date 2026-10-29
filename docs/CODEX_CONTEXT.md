@@ -37,7 +37,7 @@ SQL models: `User`, `PatientProfile`, `ConsultationSession`, `PrescriptionTempla
 - Shared CLI/admin PDF ingestion: `backend/ingest_docs.py`. pypdf extraction per page, 800-character chunks/150 overlap, embedding batches of 100, deterministic UUID5 IDs derived from filename/hash/index.
 - `DocumentIngestion` tracks hashes, previous version, status, totals, progress, and errors. Resume/restart/replacement are implemented. Previous-version chunks remain searchable until replacement completes. No OCR or durable distributed worker.
 - Admin upload is authenticated; changed content under the same filename requires replacement intent. POST `/api/admin/ingest/{filename}` launches a background thread. GET `/api/admin/docs` supplies progress and can backfill status rows.
-- Qdrant: remote when configured, otherwise embedded disk; test-mode memory storage. A local lock can trigger empty-memory fallback. Remote keyword indexes on `source` and `file_hash` are implemented.
+- Qdrant: remote when configured, otherwise embedded disk; temporary memory storage is test-only. A local disk lock now raises an actionable error instead of silently switching storage. Remote keyword indexes on `source` and `file_hash` are implemented.
 - Payload: text, source, page, title, category, file_hash, doc_id.
 - Retrieval: latest user message -> top three vector hits -> top two web snippets, sequentially -> formatted context. No relevance threshold, reranker, sparse retrieval, or query rewriting.
 - `retrieve_hybrid_context` uses `lru_cache(128)` without TTL/invalidation; single-query embeddings also have a bounded memory cache.

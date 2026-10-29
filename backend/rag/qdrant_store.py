@@ -76,13 +76,16 @@ def get_qdrant_client() -> QdrantClient:
                 _client = QdrantClient(path=local_db_path)
             except Exception as e:
                 if "lock" in str(e).lower() or "locked" in str(e).lower():
-                    logger.warning(
-                        "Local Qdrant Database is locked by another process (e.g. running FastAPI/Uvicorn server). "
-                        "Falling back to in-memory Qdrant storage (:memory:) to ensure agent stability."
+                    logger.error(
+                        "Persistent local Qdrant storage is already in use by another process. "
+                        "Ingestion and retrieval cannot continue safely."
                     )
-                    _client = QdrantClient(location=":memory:")
+                    raise RuntimeError(
+                        "Local Qdrant storage is already in use. Stop the other backend or ingestion process, "
+                        "or configure QDRANT_URL for a shared Qdrant service."
+                    ) from e
                 else:
-                    raise e
+                    raise
 
     ensure_collection_exists(_client)
     return _client

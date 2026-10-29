@@ -14,6 +14,7 @@ from config import get_settings
 from database import models as db_models
 from database.models import DocumentIngestion
 from main import app
+from rag import qdrant_store
 
 FILENAME = "synthetic_book.pdf"
 
@@ -144,6 +145,57 @@ def test_failure_is_recorded_and_resume_continues_from_last_stored_chunk(fake, t
     assert first_index_of_call(fake, calls_before + 1, h) == 100   # resumed, not restarted
     assert fake.count(FILENAME) == 250
     assert get_row().last_error is None
+
+
+def test_locked_local_qdrant_fails_without_temporary_memory_fallback(fake, tmp_path, monkeypatch):
+    """A second local process must fail, not write vectors to a disposable in-memory store."""
+    write_doc(tmp_path, "synthetic-v1:10")
+    client_calls = []
+
+    def unavailable_local_client(*args, **kwargs):
+        client_calls.append(kwargs)
+        if "path" in kwargs:
+            raise RuntimeError("storage folder is locked by another process")
+        raise AssertionError("In-memory Qdrant must not be used outside test mode")
+
+    monkeypatch.setattr(qdrant_store, "_client", None)
+    monkeypatch.setattr(qdrant_store.settings, "QDRANT_URL", "")
+    monkeypatch.setattr(qdrant_store.settings, "APP_ENV", "development")
+    monkeypatch.setattr(qdrant_store, "QdrantClient", unavailable_local_client)
+    monkeypatch.setattr(
+        ingest_docs,
+        "add_document_chunks",
+        lambda *args, **kwargs: qdrant_store.get_qdrant_client(),
+    )
+
+    result = ingest_docs.ingest_document(FILENAME)
+
+    assert result["status"] == "failed"
+    assert "Local Qdrant storage is already in use" in result["last_error"]
+    row = get_row()
+    assert (row.status, row.embedded_chunks) == ("failed", 0)
+    assert len(client_calls) == 1
+    assert "path" in client_calls[0]
+    assert all(call.get("location") != ":memory:" for call in client_calls)
+
+
+def test_explicit_test_mode_can_use_temporary_memory_qdrant(monkeypatch):
+    """In-memory Qdrant remains available for isolated automated tests."""
+    sentinel_client = object()
+    client_calls = []
+
+    def test_client(*args, **kwargs):
+        client_calls.append(kwargs)
+        return sentinel_client
+
+    monkeypatch.setattr(qdrant_store, "_client", None)
+    monkeypatch.setattr(qdrant_store.settings, "QDRANT_URL", "")
+    monkeypatch.setattr(qdrant_store.settings, "APP_ENV", "test")
+    monkeypatch.setattr(qdrant_store, "QdrantClient", test_client)
+    monkeypatch.setattr(qdrant_store, "ensure_collection_exists", lambda client: None)
+
+    assert qdrant_store.get_qdrant_client() is sentinel_client
+    assert client_calls == [{"location": ":memory:"}]
 
 
 def test_resending_an_already_stored_batch_creates_no_duplicates(fake, tmp_path):
