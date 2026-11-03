@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Search, Play, RefreshCw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Clock, User, FileText, Send, Plus, Edit3, Sparkles, BookOpen, X, Save, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Upload, Trash2, Search, Play, RefreshCw, RotateCcw, LogOut, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Clock, User, FileText, Send, Plus, Edit3, Sparkles, BookOpen, X, Save, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { naturopathyAPI, API_BASE } from '../../services/api';
+
+const DOC_STATUS_LABELS = {
+  pending: 'Not ingested',
+  in_progress: 'Ingesting…',
+  completed: 'Completed',
+  failed: 'Failed',
+  interrupted: 'Interrupted',
+  db_error: 'DB error',
+};
+
+const DOC_STATUS_CLASS = {
+  pending: 'pending',
+  in_progress: 'info',
+  completed: 'success',
+  failed: 'danger',
+  interrupted: 'danger',
+  db_error: 'danger',
+};
 
 export default function AdminDashboard({ onLogout }) {
   const [docs, setDocs] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [ingestionState, setIngestionState] = useState(null);
+  const [replaceCandidate, setReplaceCandidate] = useState(null); // { file, filename, existing }
+  const [docNotice, setDocNotice] = useState(null); // { type: 'info' | 'error', text }
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [llmAnswer, setLlmAnswer] = useState('');
@@ -44,6 +63,14 @@ export default function AdminDashboard({ onLogout }) {
   useEffect(() => {
     fetchDocs();
   }, []);
+
+  // Ingestion runs on the server, so poll the document list while any document is being ingested.
+  const ingestionActive = docs.some(doc => doc.status === 'in_progress');
+  useEffect(() => {
+    if (!ingestionActive) return;
+    const timer = setInterval(fetchDocs, 2000);
+    return () => clearInterval(timer);
+  }, [ingestionActive]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -265,79 +292,101 @@ export default function AdminDashboard({ onLogout }) {
     }
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-      alert("Only PDF files are allowed.");
-      return;
-    }
+  const errorDetail = (data, fallback) => (typeof data?.detail === 'string' ? data.detail : fallback);
 
+  const startIngestion = async (filename, restart = false) => {
+    setDocNotice(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/ingest/${encodeURIComponent(filename)}?restart=${restart}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDocNotice({ type: 'error', text: `Could not start ingestion: ${errorDetail(data, `HTTP ${res.status}`)}` });
+      }
+    } catch (err) {
+      setDocNotice({ type: 'error', text: 'Network error while starting ingestion.' });
+    }
+    await fetchDocs();
+  };
+
+  const uploadFile = async (file, replace = false) => {
     setUploading(true);
+    setDocNotice(null);
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const res = await fetch(`${API_BASE}/api/admin/upload`, {
+      const res = await fetch(`${API_BASE}/api/admin/upload?replace=${replace}`, {
         method: 'POST',
         body: formData,
         credentials: 'include'
       });
-      
-      if (res.ok) {
-        await fetchDocs();
-      } else {
-        const err = await res.json();
-        alert(`Upload failed: ${err.detail}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 409 && data.detail?.code === 'document_exists') {
+        const existing = docs.find(doc => doc.filename === data.detail.filename);
+        setReplaceCandidate({ file, filename: data.detail.filename, existing });
+        return;
       }
+      if (!res.ok) {
+        setDocNotice({ type: 'error', text: `Upload failed: ${errorDetail(data, `HTTP ${res.status}`)}` });
+        return;
+      }
+      if (data.status === 'unchanged') {
+        setDocNotice({ type: 'info', text: data.message });
+        await fetchDocs();
+        return;
+      }
+      // New or replaced file: start embedding straight away.
+      await startIngestion(data.filename);
     } catch (err) {
-      alert("Network error during upload.");
+      setDocNotice({ type: 'error', text: 'Network error during upload.' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      setDocNotice({ type: 'error', text: 'Only PDF files are allowed.' });
+      return;
+    }
+    uploadFile(file);
+  };
+
+  const confirmReplace = async () => {
+    const candidate = replaceCandidate;
+    setReplaceCandidate(null);
+    if (candidate) await uploadFile(candidate.file, true);
+  };
+
+  const handleRestart = (doc) => {
+    if (!confirm(`Restart ${doc.filename} from the first chunk? The ${doc.embedded_chunks} chunks already embedded in this attempt will be discarded and embedded again.`)) return;
+    startIngestion(doc.filename, true);
+  };
+
   const handleDelete = async (filename) => {
     if (!confirm(`Are you sure you want to delete ${filename}? This will remove it from the database.`)) return;
-    
+
     try {
-      const res = await fetch(`${API_BASE}/api/admin/docs/${filename}`, {
+      const res = await fetch(`${API_BASE}/api/admin/docs/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
         credentials: 'include'
       });
       if (res.ok) {
         await fetchDocs();
       } else {
-        alert("Delete failed.");
+        const data = await res.json().catch(() => ({}));
+        setDocNotice({ type: 'error', text: `Delete failed: ${errorDetail(data, `HTTP ${res.status}`)}` });
       }
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const handleIngest = (filename) => {
-    setIngestionState({ filename, progress: 0, message: 'Connecting...', status: 'starting' });
-    
-    const eventSource = new EventSource(`${API_BASE}/api/admin/ingest/${filename}?t=${Date.now()}`, {
-      withCredentials: true
-    });
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setIngestionState(prev => ({ ...prev, progress: data.progress || prev.progress, message: data.message, status: data.status }));
-      
-      if (data.status === 'complete' || data.status === 'error') {
-        eventSource.close();
-        if (data.status === 'complete') fetchDocs();
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-      setIngestionState(prev => ({ ...prev, status: 'error', message: 'Connection lost.' }));
-      eventSource.close();
-    };
   };
 
   const handleSearch = async (e) => {
@@ -431,70 +480,101 @@ export default function AdminDashboard({ onLogout }) {
                 </div>
               </div>
 
+              <div className="ingest-help" data-testid="ingest-help">
+                <strong>How ingestion works</strong>
+                <ul>
+                  <li><b>Add a document:</b> upload a PDF. Ingestion starts automatically and keeps running on the server, even if you close this page.</li>
+                  <li><b>If ingestion fails or is interrupted:</b> click <b>Resume</b>. It continues after the last chunk that was saved, so nothing is embedded twice. <b>Restart</b> discards that attempt and starts again from the first chunk.</li>
+                  <li><b>Update a document:</b> upload the new file with the <i>same filename</i> and confirm <b>Replace</b>. The current version stays searchable until the new one has finished.</li>
+                </ul>
+              </div>
+
+              {docNotice && (
+                <div className={`doc-notice ${docNotice.type}`} role={docNotice.type === 'error' ? 'alert' : 'status'}>
+                  <span>{docNotice.text}</span>
+                  <button className="doc-notice-close" onClick={() => setDocNotice(null)} aria-label="Dismiss"><X size={14} /></button>
+                </div>
+              )}
+
               <div className="table-responsive">
                 <table className="admin-table">
                   <thead>
                     <tr>
                       <th>Filename</th>
                       <th>Status</th>
-                      <th>Chunks</th>
+                      <th>Chunks in vector DB</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {docs.length === 0 ? (
                       <tr><td colSpan="4" className="text-center">No documents found.</td></tr>
-                    ) : docs.map(doc => (
-                      <tr key={doc.filename}>
-                        <td>{doc.filename}</td>
-                        <td>
-                          <span className={`status-badge ${doc.status === 'ingested' ? 'success' : (doc.status === 'db_error' ? 'danger' : 'pending')}`}>
-                            {doc.status}
-                          </span>
-                        </td>
-                        <td>{doc.chunks}</td>
-                        <td>
-                          <div className="action-buttons">
-                            <button 
-                              className="admin-btn-icon bg-green"
-                              onClick={() => handleIngest(doc.filename)}
-                              title="Ingest/Update"
-                            >
-                              <Play size={14} />
-                            </button>
-                            <button 
-                              className="admin-btn-icon bg-red"
-                              onClick={() => handleDelete(doc.filename)}
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    ) : docs.map(doc => {
+                      const running = doc.status === 'in_progress';
+                      const canResume = doc.status === 'failed' || doc.status === 'interrupted';
+                      const percent = doc.total_chunks > 0 ? Math.round((doc.embedded_chunks / doc.total_chunks) * 100) : 0;
+                      return (
+                        <tr key={doc.filename} data-testid={`doc-row-${doc.filename}`}>
+                          <td>
+                            {doc.filename}
+                            {doc.replacing && (
+                              <div className="doc-subtext">New version pending. The previous version stays searchable until it completes.</div>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`status-badge ${DOC_STATUS_CLASS[doc.status] || 'pending'}`}>
+                              {DOC_STATUS_LABELS[doc.status] || doc.status}
+                            </span>
+                            {doc.status !== 'completed' && doc.total_chunks > 0 && (
+                              <div className="doc-progress">
+                                <div className="progress-bar-container">
+                                  <div className="progress-bar-fill" style={{ width: `${percent}%` }}></div>
+                                </div>
+                                <span className="doc-subtext">{doc.embedded_chunks.toLocaleString()} / {doc.total_chunks.toLocaleString()} chunks</span>
+                              </div>
+                            )}
+                            {running && doc.total_chunks === 0 && <div className="doc-subtext">Reading PDF…</div>}
+                            {doc.last_error && !running && <div className="doc-error">{doc.last_error}</div>}
+                          </td>
+                          <td>{doc.chunks}</td>
+                          <td>
+                            <div className="action-buttons">
+                              {doc.status === 'pending' && (
+                                <button className="admin-btn-primary btn-small" onClick={() => startIngestion(doc.filename)} title="Embed this document">
+                                  <Play size={14} /> Start
+                                </button>
+                              )}
+                              {canResume && (
+                                <button
+                                  className="admin-btn-primary btn-small"
+                                  onClick={() => startIngestion(doc.filename)}
+                                  title={doc.embedded_chunks > 0 ? `Continue from chunk ${doc.embedded_chunks + 1}` : 'Try again'}
+                                >
+                                  <Play size={14} /> {doc.embedded_chunks > 0 ? 'Resume' : 'Retry'}
+                                </button>
+                              )}
+                              {canResume && doc.embedded_chunks > 0 && (
+                                <button className="admin-btn-outline btn-small" onClick={() => handleRestart(doc)} title="Discard this attempt and start from the first chunk">
+                                  <RotateCcw size={14} /> Restart
+                                </button>
+                              )}
+                              {running && <RefreshCw size={16} className="spin-icon" aria-label="Ingesting" />}
+                              <button
+                                className="admin-btn-icon bg-red"
+                                onClick={() => handleDelete(doc.filename)}
+                                disabled={running}
+                                title={running ? 'Wait for ingestion to finish before deleting' : 'Delete'}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-
-              {/* Ingestion Progress UI */}
-              {ingestionState && (
-                <div className="ingestion-progress-box">
-                  <div className="progress-header">
-                    <strong>Ingesting: {ingestionState.filename}</strong>
-                    {ingestionState.status === 'complete' && <CheckCircle size={16} className="text-success" />}
-                    {ingestionState.status === 'error' && <AlertCircle size={16} className="text-danger" />}
-                    {['starting', 'parsing', 'embedding'].includes(ingestionState.status) && <RefreshCw size={16} className="spin-icon" />}
-                  </div>
-                  <div className="progress-bar-container">
-                    <div className="progress-bar-fill" style={{ width: `${ingestionState.progress || 0}%` }}></div>
-                  </div>
-                  <p className="progress-message">{ingestionState.message}</p>
-                  {(ingestionState.status === 'complete' || ingestionState.status === 'error') && (
-                    <button className="admin-btn-outline btn-small" onClick={() => setIngestionState(null)}>Close</button>
-                  )}
-                </div>
-              )}
             </section>
 
             {/* Search Tester Section */}
@@ -1148,6 +1228,36 @@ export default function AdminDashboard({ onLogout }) {
         </div>
       )}
       
+      {/* Replace Document Modal */}
+      {replaceCandidate && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="replace-doc-title">
+            <h3 id="replace-doc-title">Replace {replaceCandidate.filename}?</h3>
+            <p>
+              A document with this name already exists
+              {replaceCandidate.existing && ` (${DOC_STATUS_LABELS[replaceCandidate.existing.status] || replaceCandidate.existing.status}, ${replaceCandidate.existing.chunks} chunks in the vector DB)`}
+              , and the file you selected is different.
+            </p>
+            <ul>
+              <li>The new file will be embedded from the first chunk.</li>
+              {replaceCandidate.existing && (replaceCandidate.existing.status === 'completed' || replaceCandidate.existing.replacing) ? (
+                <li>The current version stays searchable until the new one has finished, then it is removed.</li>
+              ) : (
+                <li>The existing file never finished ingesting, so its partial chunks will be discarded.</li>
+              )}
+              {replaceCandidate.existing && ['failed', 'interrupted'].includes(replaceCandidate.existing.status) && (
+                <li>If you only want to continue the failed ingestion, cancel and click <b>Resume</b> instead.</li>
+              )}
+            </ul>
+            <p className="doc-subtext">To keep both documents, cancel and rename the new file before uploading.</p>
+            <div className="admin-modal-actions">
+              <button className="admin-btn-outline" onClick={() => setReplaceCandidate(null)}>Cancel</button>
+              <button className="admin-btn-primary" onClick={confirmReplace}>Replace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {successModal.show && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1050] p-6">

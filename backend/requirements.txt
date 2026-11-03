@@ -23,5 +23,8 @@ pypdf
 passlib[bcrypt]
 PyJWT
 bcrypt==4.0.1
-email-validator  
- PyYAML
+email-validator
+PyYAML
+# Imported by the code but previously undeclared
+ddgs
+google-genai

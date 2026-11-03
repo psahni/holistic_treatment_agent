@@ -21,12 +21,13 @@ class Settings(BaseSettings):
     QDRANT_URL: str = ""        # Set to Qdrant Cloud URL or http://localhost:6333 if using external Qdrant
     QDRANT_API_KEY: str = ""    # Set if using Qdrant Cloud
     QDRANT_COLLECTION: str = "naturopathy_books"
+    QDRANT_TIMEOUT_SECONDS: float = 120.0
     
     APP_ENV: str
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5001", "http://127.0.0.1:5001"]
     DISABLE_WEB_SEARCH: bool = False
     
     ADMIN_USERNAME: str = "admin"

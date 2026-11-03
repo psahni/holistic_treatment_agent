@@ -18,13 +18,13 @@ python -m uvicorn main:app --port 8080 --host 127.0.0.1
 ```
 Check status: `http://localhost:8080/health` should return `{"status": "ok"}`.
 
-### 2. Start Frontend Server (Port 3000)
+### 2. Start Frontend Server (Port 5001)
 Run in another terminal:
 ```powershell
 cd frontend
 npm run dev
 ```
-Open `http://localhost:3000` to access the application.
+Open `http://localhost:5001` to access the application.
 
 ---
 
@@ -58,7 +58,7 @@ sequenceDiagram
 Follow these sequential steps to test the entire client lifecycle:
 
 ### Step 1: Initiate Patient Session (Question Mode)
-1. Navigate to the Patient Portal at `http://localhost:3000`.
+1. Navigate to the Patient Portal at `http://localhost:5001`.
 2. Click the **"Start Journey"** button.
 3. Fill out the demographics modal:
    - **Name**: `John Doe`
@@ -97,7 +97,7 @@ Follow these sequential steps to test the entire client lifecycle:
    - Keep note of the unique **Case ID** (e.g. `case_...` or Session ID) displayed on this card.
 
 ### Step 5: Admin / Practitioner Review Console
-1. Open a new tab and navigate to the Admin Dashboard at `http://localhost:3000/admin`.
+1. Open a new tab and navigate to the Admin Dashboard at `http://localhost:5001/admin`.
 2. Enter the credential details:
    - **Username**: `admin`
    - **Password**: `admin`
@@ -116,7 +116,7 @@ Follow these sequential steps to test the entire client lifecycle:
 4. The case is now approved and cleared from the practitioner queue.
 
 ### Step 7: View Approved Prescription
-1. Return to the Patient Portal tab (`http://localhost:3000`).
+1. Return to the Patient Portal tab (`http://localhost:5001`).
 2. On the pending review card, click **"Refresh Review Status"**.
 3. The interface dynamically updates to render your **Official Naturopathy Prescription**:
    - Formatted protocols (duration, frequency, instructions).

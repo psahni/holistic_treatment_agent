@@ -12,7 +12,7 @@ module.exports = defineConfig({
     timeout: 30 * 1000, // 30s assertion timeout
   },
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:5001',
     trace: 'on-first-retry',
     headless: true, // Run in headless mode
   },
@@ -30,7 +30,7 @@ module.exports = defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:5001',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

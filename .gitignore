@@ -51,3 +51,6 @@ test-results/
 frontend/coverage/
 
 **/*/coverage_be.json
+
+# Local dev runner state (pids, logs)
+.dev/

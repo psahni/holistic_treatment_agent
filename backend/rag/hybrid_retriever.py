@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @lru_cache(maxsize=128)
 def retrieve_hybrid_context(user_query: str) -> Dict[str, Any]:
     """Retrieves context from both Qdrant Vector Store and Live Authentic Web Search."""
-    logger.info(f"Retrieving hybrid context for query: '{user_query}'...")
+    logger.info(f"Retrieving hybrid context (query_len={len(user_query)})...")
 
     # 1. Vector Search in Qdrant (Book & KB chunks)
     vector_results = search_vector_store(user_query, limit=3)

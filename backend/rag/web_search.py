@@ -44,7 +44,7 @@ def search_authentic_web(query: str, max_results: int = 3) -> List[Dict[str, Any
         domain_filter = " OR ".join([f"site:{d}" for d in TRUSTED_DOMAINS])
         search_query = f"({domain_filter}) naturopathy {query}"
 
-        logger.info(f"Executing authentic web search: '{query}'...")
+        logger.info("Executing authentic web search...")
 
         results = []
         with DDGS() as ddgs:
@@ -53,7 +53,7 @@ def search_authentic_web(query: str, max_results: int = 3) -> List[Dict[str, Any
             # Step 2: Fallback to broader AYUSH/Naturopathy search if domain filter yielded 0
             if not raw_results:
                 fallback_query = f"naturopathy nature cure AYUSH {query}"
-                logger.info(f"Fallback search: '{fallback_query}'")
+                logger.info("Domain-restricted search returned 0 results; running fallback search.")
                 raw_results = list(ddgs.text(fallback_query, max_results=max_results))
 
             for item in raw_results:
