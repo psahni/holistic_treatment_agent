@@ -44,7 +44,7 @@ from database.models import DocumentIngestion
 logger = logging.getLogger("ingest_docs")
 
 DOCS_DIR = os.path.join(os.path.dirname(__file__), "data", "docs")
-EMBED_BATCH_SIZE = 100
+EMBED_BATCH_SIZE = 50
 
 PENDING = "pending"
 IN_PROGRESS = "in_progress"

@@ -5,8 +5,10 @@ the real vector database. Files are synthetic: their content encodes how many ch
 """
 import time
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
+from qdrant_client.http.exceptions import ResponseHandlingException
 
 import ingest_docs
 from admin import router as admin_router
@@ -120,7 +122,7 @@ def test_fresh_ingest_completes(fake, tmp_path):
 
     assert result["status"] == "completed"
     assert fake.count(FILENAME) == 250
-    assert len(fake.add_calls) == 3
+    assert len(fake.add_calls) == 5
     row = get_row()
     assert (row.status, row.embedded_chunks, row.total_chunks) == ("completed", 250, 250)
 
@@ -133,16 +135,16 @@ def test_failure_is_recorded_and_resume_continues_from_last_stored_chunk(fake, t
     assert result["status"] == "failed"
     row = get_row()
     assert row.status == "failed"
-    assert row.embedded_chunks == 100          # only the batch Qdrant confirmed
+    assert row.embedded_chunks == 50           # only the batch Qdrant confirmed
     assert "synthetic embedding failure" in row.last_error
-    assert fake.count(FILENAME) == 100
+    assert fake.count(FILENAME) == 50
 
     fake.fail_on_call = None
     calls_before = len(fake.add_calls)
     result = ingest_docs.ingest_document(FILENAME)
 
     assert result["status"] == "completed"
-    assert first_index_of_call(fake, calls_before + 1, h) == 100   # resumed, not restarted
+    assert first_index_of_call(fake, calls_before + 1, h) == 50    # resumed, not restarted
     assert fake.count(FILENAME) == 250
     assert get_row().last_error is None
 
@@ -198,15 +200,63 @@ def test_explicit_test_mode_can_use_temporary_memory_qdrant(monkeypatch):
     assert client_calls == [{"location": ":memory:"}]
 
 
+def test_remote_qdrant_uses_configured_timeout(monkeypatch):
+    sentinel_client = object()
+    client_calls = []
+
+    def remote_client(*args, **kwargs):
+        client_calls.append(kwargs)
+        return sentinel_client
+
+    monkeypatch.setattr(qdrant_store, "_client", None)
+    monkeypatch.setattr(qdrant_store.settings, "QDRANT_URL", "https://qdrant.example.invalid")
+    monkeypatch.setattr(qdrant_store.settings, "QDRANT_API_KEY", "")
+    monkeypatch.setattr(qdrant_store.settings, "QDRANT_TIMEOUT_SECONDS", 120.0)
+    monkeypatch.setattr(qdrant_store, "QdrantClient", remote_client)
+    monkeypatch.setattr(qdrant_store, "ensure_collection_exists", lambda client: None)
+
+    assert qdrant_store.get_qdrant_client() is sentinel_client
+    assert client_calls[0]["timeout"] == 120.0
+
+
+def test_qdrant_write_timeout_retries_without_regenerating_embeddings(monkeypatch):
+    class TimeoutOnceClient:
+        def __init__(self):
+            self.calls = 0
+
+        def upsert(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise ResponseHandlingException(httpx.WriteTimeout("write operation timed out"))
+
+    client = TimeoutOnceClient()
+    embedding_calls = []
+    sleeps = []
+    chunks = [{"text": "synthetic text", "source": FILENAME, "page": 1}]
+
+    monkeypatch.setattr(qdrant_store, "get_qdrant_client", lambda: client)
+    monkeypatch.setattr(
+        qdrant_store,
+        "get_embeddings",
+        lambda texts, is_batch: embedding_calls.append(list(texts)) or [[0.0] * qdrant_store.VECTOR_SIZE],
+    )
+    monkeypatch.setattr(qdrant_store.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    assert qdrant_store.add_document_chunks(chunks, ids=["point-1"]) == 1
+    assert client.calls == 2
+    assert len(embedding_calls) == 1
+    assert sleeps == [qdrant_store.QDRANT_WRITE_RETRY_BASE_SECONDS]
+
+
 def test_resending_an_already_stored_batch_creates_no_duplicates(fake, tmp_path):
     write_doc(tmp_path, "synthetic-v1:250")
     fake.fail_on_call = 3
     ingest_docs.ingest_document(FILENAME)
-    assert fake.count(FILENAME) == 200
+    assert fake.count(FILENAME) == 100
 
     # Simulate a batch that reached Qdrant but whose progress was never recorded.
     with db_models.SessionLocal() as db:
-        db.get(DocumentIngestion, FILENAME).embedded_chunks = 100
+        db.get(DocumentIngestion, FILENAME).embedded_chunks = 50
         db.commit()
 
     fake.fail_on_call = None
@@ -228,7 +278,7 @@ def test_restart_discards_partial_chunks_and_starts_from_zero(fake, tmp_path):
     h = write_doc(tmp_path, "synthetic-v1:250")
     fake.fail_on_call = 3
     ingest_docs.ingest_document(FILENAME)
-    assert get_row().embedded_chunks == 200
+    assert get_row().embedded_chunks == 100
 
     fake.fail_on_call = None
     calls_before = len(fake.add_calls)
@@ -261,7 +311,7 @@ def test_replace_keeps_old_version_live_until_new_version_completes(fake, tmp_pa
     fake.fail_on_call = len(fake.add_calls) + 2     # fail on the new version's 2nd batch
     assert ingest_docs.ingest_document(FILENAME)["status"] == "failed"
     assert fake.hashes(FILENAME) == sorted([h1, h2])  # old version still searchable
-    assert fake.count(FILENAME) == 250 + 100
+    assert fake.count(FILENAME) == 250 + 50
 
     fake.fail_on_call = None
     assert ingest_docs.ingest_document(FILENAME)["status"] == "completed"
@@ -433,7 +483,7 @@ def test_docs_list_reports_progress_and_resume_via_endpoint(fake, admin_client):
     wait_until_idle()
 
     doc = admin_client.get("/api/admin/docs").json()["docs"][0]
-    assert (doc["status"], doc["embedded_chunks"], doc["total_chunks"]) == ("failed", 100, 250)
+    assert (doc["status"], doc["embedded_chunks"], doc["total_chunks"]) == ("failed", 50, 250)
     assert doc["last_error"]
 
     fake.fail_on_call = None

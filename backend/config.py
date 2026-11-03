@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     QDRANT_URL: str = ""        # Set to Qdrant Cloud URL or http://localhost:6333 if using external Qdrant
     QDRANT_API_KEY: str = ""    # Set if using Qdrant Cloud
     QDRANT_COLLECTION: str = "naturopathy_books"
+    QDRANT_TIMEOUT_SECONDS: float = 120.0
     
     APP_ENV: str
     SECRET_KEY: str

@@ -1,6 +1,6 @@
 # Codex project memory
 
-Last updated: 2026-10-29. Store durable decisions and concise handoffs here, never secrets, patient data, or transcripts. Read with `../AGENTS.md` and `CODEX_CONTEXT.md`. Reverify source findings before fixing them.
+Last updated: 2026-11-03. Store durable decisions and concise handoffs here, never secrets, patient data, or transcripts. Read with `../AGENTS.md` and `CODEX_CONTEXT.md`. Reverify source findings before fixing them.
 
 ## Durable decisions inherited from the restored handover
 
@@ -37,7 +37,9 @@ These findings describe existing limitations, not permission to change behavior 
 
 ## Latest handoff
 
-- Runtime-verified local test audit on 2026-10-28: backend 48 passed from `backend` with a fresh redirected SQLite test DB; measured application statement coverage 68%. Frontend 50 tests/9 suites passed, but npm exited with failure because all coverage measures were below the required 75% (lines 49.93%). Follow-up on 2026-10-29: backend 50 passed after adding two local-Qdrant lock regression tests.
+- Runtime-verified on 2026-11-03 before PR preparation: backend 52 passed with synthetic settings, mocked generation/retrieval, a fresh redirected SQLite DB, and workspace pytest temporary files. The first run encountered permissions on pytest's default temporary folder; rerunning with a workspace folder passed. Local safety/reference checks (`make test` equivalent) passed 14 tests, with 2 quality tests deselected. Frontend 50 tests/9 suites passed; the command still failed the existing 75% coverage gate (lines 49.93%). No live-service evaluation or agent browser check ran. User reported successful vector-tester generation and user-facing website checks; this is user-reported evidence.
+- Source-verified pending changes prepared for commit: embedding batches of 50, configurable 120-second Qdrant timeout, and up to three acknowledged write attempts reusing generated vectors. API-key configuration remains the user's local setting; `.env` is ignored. Follow-up work should start from updated `main` on a new branch after the user reviews and merges this PR.
+- Runtime-verified local test audit on 2026-10-28: backend 48 passed from `backend` with a fresh redirected SQLite test DB; measured application statement coverage 68%. Frontend 50 tests/9 suites passed, but npm exited with failure because all coverage measures were below the required 75% (lines 49.93%). Follow-up on 2026-10-29: backend 52 passed after adding local-Qdrant lock and cloud-write timeout regression tests.
 - Local evals: 14 passed, 4 credential-dependent evals deliberately skipped. Browser and real online integrations were not run. No packages installed or application/test files changed.
 - Earlier faster backend run had a likely same-second phone-number collision; source uses identical phone generation in two tests. Email test depends on working directory. Final slower coverage run passed. Do not report the suite as reliably stable without addressing these.
 - Review found a permissive out-of-scope eval assertion, hardcoded answers in two quality evals, and a two-case dynamic set that bypasses API guardrails. Details and run limits are in `docs/test-health.md`.

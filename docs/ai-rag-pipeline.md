@@ -83,7 +83,7 @@ The implementation is in `backend/rag/qdrant_store.py`:
 
 Qdrant can run as an online service or use files on the local computer. Test mode can use temporary memory. In normal development or production, if another process has locked the local Qdrant files, the operation stops with an error. This prevents the system from reporting success after writing vectors only to temporary memory.
 
-The code slows document loading and retries some quota errors to reduce pressure on the embedding service. A quota is a provider's limit on use. Question searches use shorter retries. Some repeated question embeddings are saved for reuse.
+The code loads documents in batches of 50 chunks. It slows document loading and retries some quota errors to reduce pressure on the embedding service. Qdrant Cloud connections use a longer configurable timeout. Qdrant writes use up to three attempts on timeout, reusing the same already-generated vectors, so a temporary network delay does not immediately repeat the Gemini embedding work. A quota is a provider's limit on use. Question searches use shorter retries. Some repeated question embeddings are saved for reuse.
 
 ## 3. Receiving a question
 

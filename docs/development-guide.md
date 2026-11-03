@@ -58,7 +58,7 @@ Only setting names are listed here:
 |---|---|
 | Required server settings | `DATABASE_URL`, `APP_ENV`, `SECRET_KEY` |
 | Google AI connection and answer controls | `USE_VERTEX_AI`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GCP_PROJECT`, `GCP_LOCATION`, `TEMPERATURE`, `MAX_TOKENS` |
-| Searchable reference store and web search | `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION`, `DISABLE_WEB_SEARCH` |
+| Searchable reference store and web search | `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION`, `QDRANT_TIMEOUT_SECONDS`, `DISABLE_WEB_SEARCH` |
 | Temporary conversations and reused answers | `REDIS_URL`, `CACHE_LLM`, `CACHE_TTL_SECONDS` |
 | Sign-in and allowed website connections | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `CORS_ORIGINS` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` |

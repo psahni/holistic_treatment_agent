@@ -34,7 +34,7 @@ SQL models: `User`, `PatientProfile`, `ConsultationSession`, `PrescriptionTempla
 
 ## RAG and ingestion
 
-- Shared CLI/admin PDF ingestion: `backend/ingest_docs.py`. pypdf extraction per page, 800-character chunks/150 overlap, embedding batches of 100, deterministic UUID5 IDs derived from filename/hash/index.
+- Shared CLI/admin PDF ingestion: `backend/ingest_docs.py`. pypdf extraction per page, 800-character chunks/150 overlap, embedding batches of 50, deterministic UUID5 IDs derived from filename/hash/index.
 - `DocumentIngestion` tracks hashes, previous version, status, totals, progress, and errors. Resume/restart/replacement are implemented. Previous-version chunks remain searchable until replacement completes. No OCR or durable distributed worker.
 - Admin upload is authenticated; changed content under the same filename requires replacement intent. POST `/api/admin/ingest/{filename}` launches a background thread. GET `/api/admin/docs` supplies progress and can backfill status rows.
 - Qdrant: remote when configured, otherwise embedded disk; temporary memory storage is test-only. A local disk lock now raises an actionable error instead of silently switching storage. Remote keyword indexes on `source` and `file_hash` are implemented.
@@ -90,7 +90,7 @@ npx playwright test
 
 Names only. Required backend settings: `DATABASE_URL`, `APP_ENV`, `SECRET_KEY`.
 
-Other settings: `USE_VERTEX_AI`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GCP_PROJECT`, `GCP_LOCATION`, `MAX_TOKENS`, `TEMPERATURE`, `REDIS_URL`, `CACHE_LLM`, `CACHE_TTL_SECONDS`, `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `CORS_ORIGINS`, `DISABLE_WEB_SEARCH`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+Other settings: `USE_VERTEX_AI`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GCP_PROJECT`, `GCP_LOCATION`, `MAX_TOKENS`, `TEMPERATURE`, `REDIS_URL`, `CACHE_LLM`, `CACHE_TTL_SECONDS`, `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION`, `QDRANT_TIMEOUT_SECONDS`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `CORS_ORIGINS`, `DISABLE_WEB_SEARCH`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
 
 Mailer: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` (read through `os.getenv`; Pydantic dotenv loading does not itself populate process environment).
 

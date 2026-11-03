@@ -5,7 +5,9 @@ import json
 import time
 from typing import List, Dict, Any, Optional
 
+import httpx
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
 from google import genai
 
@@ -16,6 +18,8 @@ settings = get_settings()
 
 COLLECTION_NAME = settings.QDRANT_COLLECTION
 VECTOR_SIZE = 3072  # gemini-embedding-001 vector dimension
+QDRANT_WRITE_MAX_ATTEMPTS = 3
+QDRANT_WRITE_RETRY_BASE_SECONDS = 2.0
 
 _client: Optional[QdrantClient] = None
 _genai_client: Optional[genai.Client] = None       # generation client
@@ -62,7 +66,7 @@ def get_qdrant_client() -> QdrantClient:
         _client = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY if settings.QDRANT_API_KEY else None,
-            timeout=10
+            timeout=settings.QDRANT_TIMEOUT_SECONDS,
         )
     else:
         if settings.APP_ENV == "test":
@@ -221,9 +225,22 @@ def add_document_chunks(chunks: List[Dict[str, Any]], file_hash: str = "", doc_i
             points.append(PointStruct(id=point_id, vector=vector, payload=payload))
 
     if points:
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
-        logger.info(f"Successfully upserted {len(points)} chunks into Qdrant.")
-        return len(points)
+        for attempt in range(1, QDRANT_WRITE_MAX_ATTEMPTS + 1):
+            try:
+                # wait=True means progress is recorded only after Qdrant confirms the write.
+                client.upsert(collection_name=COLLECTION_NAME, points=points, wait=True)
+                logger.info(f"Successfully upserted {len(points)} chunks into Qdrant.")
+                return len(points)
+            except ResponseHandlingException as e:
+                if not isinstance(e.source, httpx.TimeoutException) or attempt == QDRANT_WRITE_MAX_ATTEMPTS:
+                    raise
+                wait_seconds = QDRANT_WRITE_RETRY_BASE_SECONDS * (2 ** (attempt - 1))
+                logger.warning(
+                    "Qdrant write timed out; retrying the same %s points in %.1f seconds "
+                    "(attempt %s/%s).",
+                    len(points), wait_seconds, attempt + 1, QDRANT_WRITE_MAX_ATTEMPTS,
+                )
+                time.sleep(wait_seconds)
     return 0
 
 

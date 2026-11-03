@@ -2,11 +2,13 @@
 
 Initially checked on 2026-10-28 using the existing installed packages. A focused follow-up on 2026-10-29 verified the local-Qdrant lock safety change and then reran the full backend suite. No packages were installed. This report covers local checks; it does not establish that real online AI, search, database hosting, or email services work.
 
+Runtime-verified again on 2026-11-03 for PR preparation: backend 52 passed, local safety/reference checks 14 passed (2 quality tests deselected), and frontend 50 tests across 9 suites passed. Frontend coverage still failed the existing 75% gate with the percentages below. The backend runner disabled dotenv loading, supplied synthetic settings, redirected the hardcoded test SQLite URL to a fresh disposable database, disabled real SMTP/Redis, and blocked external socket connections. Pytest temporary files were redirected into the workspace after default-folder permissions caused setup errors in the first attempt. Frontend coverage output went to ignored `.dev/` files. No new coverage measurement for the backend or live-service/browser evaluation was performed.
+
 ## Results
 
 | Area | Result | Meaning |
 |---|---|---|
-| Backend tests, including API workflows | 50 passed on the 2026-10-29 run | Includes two regression tests for persistent local Qdrant lock handling and test-only memory storage |
+| Backend tests, including API workflows | 52 passed on the latest 2026-11-03 run | Includes regression tests for local Qdrant lock handling, test-only memory storage, configurable cloud timeout, and write retry without repeat embedding |
 | Frontend tests | 50 passed across 9 suites | Existing website checks passed |
 | Frontend coverage requirement | Failed | Tests exercise less code than the configured 75% minimum |
 | Local safety/reference evals | 14 passed | Existing keyword checks and reference-file checks passed |
